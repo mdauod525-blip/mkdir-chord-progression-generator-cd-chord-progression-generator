@@ -9,6 +9,7 @@ import { LENGTH_OPTIONS, HARMONIC_RHYTHMS } from '../generator/progression.js';
 import { VOICING_STYLES } from '../theory/voicing.js';
 import { INSTRUMENTS } from '../audio/synth.js';
 import { PLAY_STYLES } from '../audio/transport.js';
+import { ARP_PATTERNS, ARP_SPEEDS } from '../audio/patterns.js';
 
 const COMPLEXITY_LABELS = ['Simple', 'Easy', 'Colorful', 'Rich', 'Jazzy'];
 export const TEMPO_RANGE = [40, 240];
@@ -60,13 +61,11 @@ export function renderControls(container, state, onChange) {
   const sound = h(
     'details',
     { class: 'sound-options', open: state.soundOpen || false },
-    h('summary', {}, 'Sound & voicing'),
+    h('summary', {}, 'Voicing & metronome'),
     h(
       'div',
       { class: 'grid-2' },
       field('Voicing', select('voicing', Object.entries(VOICING_STYLES), s.voicing, (v) => onChange('voicing', v), { label: 'Voicing' })),
-      field('Instrument', select('instrument', Object.entries(INSTRUMENTS), p.instrument, (v) => onChange('instrument', v), { label: 'Instrument' })),
-      field('Rhythm', select('style', Object.entries(PLAY_STYLES), p.style, (v) => onChange('style', v), { label: 'Playback rhythm' })),
       field(
         'Metronome',
         h(
@@ -112,6 +111,18 @@ export function renderControls(container, state, onChange) {
       { class: 'grid-2' },
       field('Length', segmented('measures', LENGTH_OPTIONS.map((n) => [n, String(n)]), s.measures, (v) => onChange('measures', Number(v)), { label: 'Length in bars' }), { hint: 'bars' }),
       field('Chords / bar', segmented('harmonicRhythm', Object.entries(HARMONIC_RHYTHMS).map(([k, v]) => [k, k === 'auto' ? 'Auto' : k]), s.harmonicRhythm, (v) => onChange('harmonicRhythm', v), { label: 'Chords per bar' })),
+    ),
+    h('div', { class: 'sound-block' },
+      field('Sound', select('instrument', Object.entries(INSTRUMENTS), p.instrument, (v) => onChange('instrument', v), { label: 'Sound' })),
+      field('Play style', segmented('style', Object.entries(PLAY_STYLES), p.style, (v) => onChange('style', v), { label: 'Play style' })),
+      p.style === 'arpeggio'
+        ? h(
+            'div',
+            { class: 'grid-2 arp-options' },
+            field('Pattern', select('arpPattern', Object.entries(ARP_PATTERNS), p.arpPattern, (v) => onChange('arpPattern', v), { label: 'Arpeggio pattern' })),
+            field('Speed', segmented('arpSpeed', Object.entries(ARP_SPEEDS), p.arpSpeed, (v) => onChange('arpSpeed', String(v)), { label: 'Arpeggio speed' })),
+          )
+        : null,
     ),
     sound,
   );

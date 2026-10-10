@@ -6,13 +6,15 @@
  * Tempo, metronome and loop changes take effect on the next eighth note.
  */
 import { getAudio, unlockAudio } from './engine.js';
-import { playChord, playClick, playNote, playBass } from './synth.js';
+import { playChord, playClick, playNote, DEFAULT_INSTRUMENT, STRUMMED } from './synth.js';
+import { arpeggioStep, strumAction } from './patterns.js';
 import { buildTimeline } from './timeline.js';
 import { secondsPerEighth, getTimeSignature, beatGrid } from '../theory/timeSignature.js';
 
 export const PLAY_STYLES = {
-  sustain: 'Sustained',
-  pulse: 'On the beat',
+  sustain: 'Sustain',
+  pulse: 'Beat',
+  strum: 'Strum',
   arpeggio: 'Arpeggio',
 };
 
@@ -30,8 +32,10 @@ export class Transport {
       metronome: false,
       subdivisions: false,
       countIn: false,
-      instrument: 'keys',
+      instrument: DEFAULT_INSTRUMENT,
       style: 'sustain',
+      arpPattern: 'up',
+      arpSpeed: '8',
       volume: 1,
     };
     this.handles = [];
@@ -135,28 +139,52 @@ export class Transport {
     }
 
     const voicing = this.voicings[ev.slotIndex];
-    if (voicing) {
-      const groups = getTimeSignature(ts).groups;
-      if (o.style === 'pulse') {
-        if (ev.isBeat) {
-          const len = Math.min(groups[ev.group], ev.slotStart + ev.slotDuration - ev.index);
-          const velocity = ev.accent >= 2 ? 1 : ev.accent === 1 ? 0.85 : 0.7;
-          this.track(playChord(ctx, out, voicing, { time, duration: len * spe * 0.85, instrument: o.instrument, velocity, bass: ev.chordStart || ev.accent >= 1 }));
-        }
-      } else if (o.style === 'arpeggio') {
-        const step = ev.index - ev.slotStart;
-        if (ev.chordStart) this.track([playBass(ctx, out, voicing.bass, { time, duration: ev.slotDuration * spe })]);
-        const notes = voicing.upper;
-        const cycle = notes.concat(notes.slice(1, -1).reverse());
-        const note = cycle[step % cycle.length];
-        this.track([playNote(ctx, out, note, { time, duration: spe * 1.6, instrument: o.instrument, velocity: ev.isBeat ? 0.95 : 0.75 })]);
-      } else if (ev.chordStart) {
-        const strum = o.instrument === 'pluck' ? 0.018 : 0;
-        this.track(playChord(ctx, out, voicing, { time, duration: ev.slotDuration * spe, instrument: o.instrument, strum }));
-      }
-    }
+    if (voicing) this.scheduleChordPart(ev, voicing, time, spe);
 
     this.visualQueue.push({ time, slotIndex: ev.slotIndex, measure: ev.measure, eighthInMeasure: ev.eighthInMeasure, isBeat: ev.isBeat });
+  }
+
+  /** Schedule what the chord instrument plays on this eighth for the chosen style. */
+  scheduleChordPart(ev, voicing, time, spe) {
+    const { ctx, out, options: o } = this;
+    const instrument = o.instrument;
+    const slotEnd = ev.slotStart + ev.slotDuration;
+    const remaining = (slotEnd - ev.index) * spe;
+    const naturalStrum = STRUMMED.has(instrument) ? 0.016 : 0;
+
+    if (o.style === 'pulse') {
+      if (!ev.isBeat) return;
+      const len = Math.min(ev.groupSize, slotEnd - ev.index);
+      const velocity = ev.accent >= 2 ? 1 : ev.accent === 1 ? 0.85 : 0.7;
+      this.track(playChord(ctx, out, voicing, { time, duration: len * spe * 0.85, instrument, velocity, strum: naturalStrum * 0.6, bass: ev.chordStart || ev.accent >= 1 }));
+    } else if (o.style === 'strum') {
+      const action = strumAction(ev.posInGroup, ev.groupSize);
+      if (!action) return;
+      if (action === 'down') {
+        const ring = Math.min(Math.max(ev.groupSize - 1, 1), slotEnd - ev.index) * spe;
+        const velocity = ev.accent >= 2 ? 0.95 : ev.accent === 1 ? 0.85 : 0.75;
+        this.track(playChord(ctx, out, voicing, { time, duration: ring, instrument, velocity, strum: 0.013, bass: ev.chordStart || ev.accent >= 1 }));
+      } else {
+        // Up-strums hit only the top strings, lighter and in reverse order.
+        const top = voicing.upper.slice(-3);
+        this.track(playChord(ctx, out, voicing, { time, duration: Math.min(spe, remaining), instrument, velocity: 0.55, strum: 0.009, bass: false, notes: top, direction: 'up' }));
+      }
+    } else if (o.style === 'arpeggio') {
+      const perEighth = o.arpSpeed === '16' ? 2 : 1;
+      const sustained = instrument === 'piano' || instrument === 'guitar';
+      for (let sub = 0; sub < perEighth; sub++) {
+        const step = (ev.index - ev.slotStart) * perEighth + sub;
+        const t = time + (sub * spe) / perEighth;
+        // Piano and guitar let notes ring to the end of the chord, like a sustain pedal.
+        const duration = sustained ? Math.max(remaining - (sub * spe) / perEighth, 0.2) : (spe / perEighth) * 1.8;
+        const accent = step === 0 ? 1 : ev.isBeat && sub === 0 ? 0.85 : 0.7;
+        for (const note of arpeggioStep(voicing, step, o.arpPattern)) {
+          this.track([playNote(ctx, out, note, { time: t, duration, instrument, velocity: accent })]);
+        }
+      }
+    } else if (ev.chordStart) {
+      this.track(playChord(ctx, out, voicing, { time, duration: ev.slotDuration * spe, instrument, strum: naturalStrum }));
+    }
   }
 
   track(handles) {
@@ -181,7 +209,7 @@ export class Transport {
   async preview(voicing, { instrument = this.options.instrument, duration = 1.2 } = {}) {
     await unlockAudio();
     const { ctx, master } = getAudio();
-    const strum = instrument === 'pluck' ? 0.02 : 0;
+    const strum = STRUMMED.has(instrument) ? 0.02 : 0;
     playChord(ctx, master, voicing, { time: ctx.currentTime + 0.02, duration, instrument, strum });
   }
 }

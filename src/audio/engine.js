@@ -28,8 +28,34 @@ export function getAudio() {
   master = ctx.createGain();
   master.gain.value = 0.8;
   master.connect(compressor);
+
+  // A small synthetic room: a short convolution reverb on a send.
+  const reverb = ctx.createConvolver();
+  reverb.buffer = roomImpulse(ctx, 1.6);
+  const send = ctx.createGain();
+  send.gain.value = 0.22;
+  master.connect(send);
+  send.connect(reverb);
+  reverb.connect(compressor);
+
   compressor.connect(ctx.destination);
   return { ctx, master };
+}
+
+/** Stereo decaying-noise impulse response for a natural-sounding room. */
+function roomImpulse(c, seconds) {
+  const length = Math.floor(c.sampleRate * seconds);
+  const buffer = c.createBuffer(2, length, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = buffer.getChannelData(ch);
+    let lp = 0;
+    for (let i = 0; i < length; i++) {
+      const t = i / length;
+      lp += 0.35 * (Math.random() * 2 - 1 - lp); // darken the tail
+      data[i] = lp * Math.pow(1 - t, 3) * (i < c.sampleRate * 0.01 ? i / (c.sampleRate * 0.01) : 1);
+    }
+  }
+  return buffer;
 }
 
 /**

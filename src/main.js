@@ -24,21 +24,34 @@ import { describeChord } from './theory/chords.js';
 import { makeKey } from './theory/scales.js';
 import { normalizeTonic, toAscii } from './theory/notes.js';
 import { beatsPerMeasure, beatGrid } from './theory/timeSignature.js';
-import { Transport } from './audio/transport.js';
+import { Transport, PLAY_STYLES } from './audio/transport.js';
+import { INSTRUMENTS, DEFAULT_INSTRUMENT, prepareNotes } from './audio/synth.js';
+import { ARP_PATTERNS, ARP_SPEEDS } from './audio/patterns.js';
 import { isAudioSupported } from './audio/engine.js';
 import { progressionToText } from './export/text.js';
 import { progressionToMidi } from './export/midi.js';
 import { createFavoritesStore } from './storage/favorites.js';
 
 const GENERATION_KEYS = ['genre', 'mood', 'complexity', 'measures', 'harmonicRhythm'];
-const DEFAULT_PLAYBACK = { instrument: 'keys', style: 'sustain', metronome: false, loop: true, subdivisions: false, countIn: false };
+const DEFAULT_PLAYBACK = { instrument: DEFAULT_INSTRUMENT, style: 'sustain', arpPattern: 'up', arpSpeed: '8', metronome: false, loop: true, subdivisions: false, countIn: false };
 
 const store = createFavoritesStore();
+
+/** Merge saved playback prefs with defaults, dropping values from older versions. */
+function sanitizePlayback(saved = {}) {
+  const p = { ...DEFAULT_PLAYBACK, ...saved };
+  if (p.instrument === 'pluck') p.instrument = 'guitar';
+  if (!INSTRUMENTS[p.instrument]) p.instrument = DEFAULT_INSTRUMENT;
+  if (!PLAY_STYLES[p.style]) p.style = DEFAULT_PLAYBACK.style;
+  if (!ARP_PATTERNS[p.arpPattern]) p.arpPattern = DEFAULT_PLAYBACK.arpPattern;
+  if (!ARP_SPEEDS[p.arpSpeed]) p.arpSpeed = DEFAULT_PLAYBACK.arpSpeed;
+  return p;
+}
 const prefs = store.loadPrefs() || {};
 
 const state = {
   settings: normalizeSettings(prefs.settings),
-  playback: { ...DEFAULT_PLAYBACK, ...(prefs.playback || {}) },
+  playback: sanitizePlayback(prefs.playback),
   progression: null,
   voicings: [],
   selected: null,
@@ -114,6 +127,13 @@ function revoice() {
   const key = makeKey(p.settings.tonic, p.settings.mode);
   state.voicings = voiceProgression(p.slots.map((s) => s.chord), key, p.settings.voicing);
   if (state.playing) transport.setProgression(p, state.voicings);
+  warmInstrument();
+}
+
+/** Pre-render the current instrument's notes in the background so playback starts instantly. */
+function warmInstrument() {
+  const notes = state.voicings.flatMap((v) => [v.bass, ...v.upper]);
+  return prepareNotes(state.playback.instrument, notes);
 }
 
 function renderSettings() {
@@ -204,12 +224,23 @@ function onSettingChange(key, value) {
       setProgression({ ...state.progression, settings: { ...state.progression.settings, voicing: value } });
       break;
     case 'instrument':
+      state.playback.instrument = value;
+      transport.setOptions({ instrument: value });
+      warmInstrument().then(() => {
+        if (!state.playing && state.voicings[0]) transport.preview(state.voicings[0], { duration: 1.2 });
+      });
+      break;
     case 'style':
+      state.playback.style = value;
+      transport.setOptions({ style: value });
+      renderSettings();
+      break;
+    case 'arpPattern':
+    case 'arpSpeed':
     case 'subdivisions':
     case 'countIn':
       state.playback[key] = value;
       transport.setOptions({ [key]: value });
-      if (key === 'instrument' && state.voicings[0]) transport.preview(state.voicings[0], { duration: 0.8 });
       break;
     case 'soundOpen':
       state.soundOpen = value;
@@ -235,6 +266,7 @@ async function togglePlay() {
     transport.stop();
     return;
   }
+  await warmInstrument();
   await transport.play(state.progression, state.voicings, { ...state.playback, tempo: state.settings.tempo });
 }
 
@@ -340,7 +372,7 @@ function openExport() {
       if (r !== 'cancelled') toast('Text file ready');
     },
     onMidi: async () => {
-      const bytes = progressionToMidi(state.progression, state.voicings);
+      const bytes = progressionToMidi(state.progression, state.voicings, { instrument: state.playback.instrument });
       const r = await shareOrDownload(new Blob([bytes], { type: 'audio/midi' }), `${fileBase()}.mid`);
       if (r !== 'cancelled') toast('MIDI file ready');
     },
