@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="ChordLab – generate, hear and export chord progressions for songwriting." />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ChordLab" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <title>ChordLab</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+            <rect x="2" y="2" width="28" height="28" rx="8" fill="currentColor" opacity=".16" />
+            <rect x="8" y="9" width="4" height="14" rx="2" fill="currentColor" />
+            <rect x="14" y="6" width="4" height="20" rx="2" fill="currentColor" />
+            <rect x="20" y="11" width="4" height="10" rx="2" fill="currentColor" />
+          </svg>
+          <div>
+            <h1>ChordLab</h1>
+            <p class="tagline">Chord progression generator</p>
+          </div>
+        </div>
+        <button class="icon-btn" id="favorites-btn" type="button" aria-label="Saved progressions">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
+          <span class="badge" id="favorites-count" hidden>0</span>
+        </button>
+      </header>
+
+      <main>
+        <section class="card settings" aria-label="Settings">
+          <div id="controls"></div>
+        </section>
+
+        <button class="generate-btn" id="generate-btn" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6M20 12a8 8 0 0 1-13.7 5.6M17 3v4h-4M7 21v-4h4" /></svg>
+          <span>Generate progression</span>
+        </button>
+
+        <section class="progression" aria-label="Progression" aria-live="polite">
+          <div class="prog-head">
+            <div>
+              <h2 id="prog-title">Progression</h2>
+              <p class="prog-sub" id="prog-sub"></p>
+            </div>
+            <div class="prog-actions">
+              <button class="chip-btn" id="save-btn" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
+                <span>Save</span>
+              </button>
+              <button class="chip-btn" id="export-btn" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+                <span>Export</span>
+              </button>
+            </div>
+          </div>
+          <div class="measures" id="measures"></div>
+          <div class="legend" aria-hidden="true">
+            <span><i class="dot dot-borrowed"></i>Borrowed</span>
+            <span><i class="dot dot-secondary"></i>Secondary dominant</span>
+            <span><i class="dot dot-tritone"></i>Tritone sub</span>
+            <span><i class="dot dot-locked"></i>Locked</span>
+          </div>
+          <p class="hint">Tap a chord to hear it, change it, or lock it before regenerating.</p>
+        </section>
+      </main>
+
+      <nav class="transport" aria-label="Playback">
+        <div class="transport-inner">
+          <button class="play-btn" id="play-btn" type="button" aria-label="Play">
+            <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" /></svg>
+            <svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2" /></svg>
+          </button>
+          <div class="transport-mid">
+            <div class="position" id="position">Ready</div>
+            <div class="tempo-ctrl">
+              <button type="button" class="mini-btn" id="tempo-down" aria-label="Slower">−</button>
+              <span id="tempo-readout">100</span>
+              <button type="button" class="mini-btn" id="tempo-up" aria-label="Faster">+</button>
+            </div>
+          </div>
+          <div class="toggles">
+            <button type="button" class="toggle" id="metronome-btn" aria-pressed="false" aria-label="Metronome">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l4 18H5zM12 15l5-8M8 17h8" /></svg>
+            </button>
+            <button type="button" class="toggle" id="loop-btn" aria-pressed="true" aria-label="Loop">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" /></svg>
+            </button>
+          </div>
+        </div>
+      </nav>
+    </div>
+
+    <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+    <section class="sheet" id="chord-sheet" role="dialog" aria-modal="true" aria-labelledby="chord-sheet-title" hidden></section>
+    <section class="sheet" id="favorites-sheet" role="dialog" aria-modal="true" aria-labelledby="favorites-title" hidden></section>
+    <section class="sheet" id="export-sheet" role="dialog" aria-modal="true" aria-labelledby="export-title" hidden></section>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

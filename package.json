@@ -1,0 +1,19 @@
+{
+  "name": "chordlab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ChordLab — a mobile-friendly chord progression generator for musicians and songwriters.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
+  }
+}
