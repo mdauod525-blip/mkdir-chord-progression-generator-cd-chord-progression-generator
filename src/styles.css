@@ -718,6 +718,221 @@ input[type='range']::-moz-range-thumb {
   transform: scaleY(1.5);
 }
 
+.display-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.display-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#display-mode {
+  flex: 1;
+  max-width: 320px;
+}
+
+.chord-notes {
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.chord.playing .chord-notes {
+  color: #04121a;
+}
+
+.chord-shape {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.chord-shape svg {
+  display: block;
+  width: 100%;
+  max-width: 64px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.chord-shape.piano svg {
+  max-width: 132px;
+}
+
+/* Diagram colours come from theme tokens so both light and dark work.
+   Reset the icon stroke that the global svg rule applies. */
+.diagram,
+.diagram text,
+.diagram .dg-dot,
+.diagram .dg-nut {
+  stroke: none;
+}
+.diagram .dg-line {
+  stroke: var(--muted);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+
+.diagram .dg-nut {
+  fill: var(--text);
+}
+
+.diagram .dg-dot {
+  fill: var(--accent);
+}
+
+.diagram .dg-dot.bass {
+  fill: var(--secondary);
+}
+
+.diagram .dg-open.bass {
+  stroke: var(--secondary);
+}
+
+.diagram .dg-open {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+.diagram .dg-mark,
+.diagram .dg-pos,
+.diagram .dg-text {
+  fill: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font);
+}
+
+.diagram .dg-note {
+  fill: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font);
+}
+
+.diagram .pk-white {
+  fill: #f5f6fa;
+  stroke: #9aa3b2;
+  stroke-width: 0.75;
+}
+
+.diagram .pk-black {
+  fill: #1b1e26;
+  stroke: #1b1e26;
+}
+
+.diagram .pk-white.on,
+.diagram .pk-black.on {
+  fill: var(--accent);
+}
+
+.diagram .pk-white.bass,
+.diagram .pk-black.bass {
+  fill: var(--secondary);
+}
+
+.diagram .pk-label {
+  fill: #ffffff;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font);
+}
+
+.chord.playing .diagram .dg-dot {
+  fill: #04121a;
+}
+
+.chord.playing .diagram .dg-line,
+.chord.playing .diagram .dg-open {
+  stroke: #04121a;
+}
+
+.chord.playing .diagram .dg-mark,
+.chord.playing .diagram .dg-nut {
+  fill: #04121a;
+}
+
+.shapes {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.shape-card {
+  min-width: 0;
+  padding: 10px 12px 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.shape-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shape-head .sheet-section {
+  margin: 0 0 8px;
+}
+
+.shape-head small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.shape-code {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text) !important;
+  letter-spacing: 0.08em;
+}
+
+.shape-figure svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.shape-figure.guitar svg {
+  max-width: 170px;
+  margin: 0 auto;
+}
+
+.shape-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.shape-nav .mini-btn {
+  min-width: 40px;
+  height: 36px;
+}
+
+@media (min-width: 520px) {
+  .shapes {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;

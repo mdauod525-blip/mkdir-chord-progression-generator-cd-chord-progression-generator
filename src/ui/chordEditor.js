@@ -2,7 +2,9 @@
  * Chord editor sheet: audition, regenerate, lock, invert or recolour one chord.
  */
 import { h, mount } from './dom.js';
-import { describeChord, maxInversion, QUALITIES, chordSymbol } from '../theory/chords.js';
+import { describeChord, maxInversion, QUALITIES, chordSymbol, chordSpeller } from '../theory/chords.js';
+import { guitarShapes, shapeToString } from '../theory/guitar.js';
+import { guitarDiagram, pianoDiagram } from './diagrams.js';
 import { makeKey } from '../theory/scales.js';
 import { qualityOptions } from '../generator/progression.js';
 
@@ -20,7 +22,7 @@ const FUNC_TEXT = {
  * @param state   { progression, index }
  * @param actions { play, regenerate, toggleLock, setInversion, setQuality, select, close }
  */
-export function renderChordEditor(el, { progression, index }, actions) {
+export function renderChordEditor(el, { progression, index, voicing, shapeIndex = 0 }, actions) {
   const slot = progression.slots[index];
   const chord = slot.chord;
   const key = makeKey(progression.settings.tonic, progression.settings.mode);
@@ -53,6 +55,7 @@ export function renderChordEditor(el, { progression, index }, actions) {
       h('button', { type: 'button', class: 'action', onclick: actions.regenerate, disabled: chord.locked }, '↻ New chord'),
       h('button', { type: 'button', class: `action${chord.locked ? ' on' : ''}`, 'aria-pressed': String(chord.locked), onclick: actions.toggleLock }, chord.locked ? '🔒 Locked' : '🔓 Lock'),
     ),
+    shapesSection(chord, key, voicing, shapeIndex, d.symbol, actions),
     h('h4', { class: 'sheet-section' }, 'Inversion'),
     h(
       'div',
@@ -81,5 +84,42 @@ export function renderChordEditor(el, { progression, index }, actions) {
       ),
     ),
     h('button', { type: 'button', class: 'action wide', onclick: actions.close }, 'Done'),
+  );
+}
+
+function shapesSection(chord, key, voicing, shapeIndex, symbol, actions) {
+  const names = chordSpeller(chord, key);
+  const shapes = guitarShapes(chord, key, { limit: 3 });
+  const i = shapes.length ? shapeIndex % shapes.length : 0;
+  const shape = shapes[i];
+  return h(
+    'div',
+    { class: 'shapes' },
+    h(
+      'div',
+      { class: 'shape-card' },
+      h('div', { class: 'shape-head' }, h('h4', { class: 'sheet-section' }, 'Piano'), h('small', {}, 'as played')),
+      h('div', { class: 'shape-figure', html: voicing ? pianoDiagram(voicing.upper, { bass: voicing.bass, names, label: symbol }) : '' }),
+    ),
+    h(
+      'div',
+      { class: 'shape-card' },
+      h(
+        'div',
+        { class: 'shape-head' },
+        h('h4', { class: 'sheet-section' }, 'Guitar'),
+        shape ? h('small', { class: 'shape-code' }, shapeToString(shape)) : null,
+      ),
+      h('div', { class: 'shape-figure guitar', html: guitarDiagram(shape, { names, label: symbol }) }),
+      shapes.length > 1
+        ? h(
+            'div',
+            { class: 'shape-nav' },
+            h('button', { type: 'button', class: 'mini-btn', 'aria-label': 'Previous guitar shape', onclick: () => actions.setShape(i - 1 + shapes.length) }, '‹'),
+            h('span', {}, `Shape ${i + 1} of ${shapes.length}`),
+            h('button', { type: 'button', class: 'mini-btn', 'aria-label': 'Next guitar shape', onclick: () => actions.setShape(i + 1) }, '›'),
+          )
+        : null,
+    ),
   );
 }

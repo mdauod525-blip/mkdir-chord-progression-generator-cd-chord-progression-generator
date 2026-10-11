@@ -3,7 +3,9 @@
  * beat-division ruler that reflects the time signature's grouping.
  */
 import { h, mount } from './dom.js';
-import { describeChord } from '../theory/chords.js';
+import { describeChord, chordSpeller } from '../theory/chords.js';
+import { guitarShapes } from '../theory/guitar.js';
+import { guitarDiagram, pianoDiagram } from './diagrams.js';
 import { makeKey } from '../theory/scales.js';
 import { beatGrid } from '../theory/timeSignature.js';
 import { slotsByMeasure } from '../export/text.js';
@@ -20,7 +22,20 @@ const FUNC_LABELS = {
  * @param progression
  * @param opts { selected: slot index, onSelect: (index) => void }
  */
-export function renderProgression(container, progression, { selected = null, onSelect } = {}) {
+export const DISPLAY_MODES = { notes: 'Notes', guitar: 'Guitar', piano: 'Piano' };
+
+/** The extra detail shown under each chord name for the chosen display mode. */
+function chordDetail(chord, key, voicing, mode, notes) {
+  if (mode === 'guitar') {
+    return h('span', { class: 'chord-shape', html: guitarDiagram(guitarShapes(chord, key)[0], { compact: true }) });
+  }
+  if (mode === 'piano' && voicing) {
+    return h('span', { class: 'chord-shape piano', html: pianoDiagram(voicing.upper, { compact: true, names: chordSpeller(chord, key) }) });
+  }
+  return h('span', { class: 'chord-notes' }, notes.join(' · '));
+}
+
+export function renderProgression(container, progression, { selected = null, onSelect, display = 'notes', voicings = [] } = {}) {
   const s = progression.settings;
   const key = makeKey(s.tonic, s.mode);
   const grid = beatGrid(s.timeSignature);
@@ -30,7 +45,7 @@ export function renderProgression(container, progression, { selected = null, onS
   const cards = measures.map((slots, m) =>
     h(
       'div',
-      { class: `measure${wide ? ' wide' : ''}`, dataset: { measure: m } },
+      { class: `measure${wide ? ' wide' : ''} display-${display}`, dataset: { measure: m } },
       h('div', { class: 'measure-num' }, String(m + 1)),
       h(
         'div',
@@ -53,6 +68,7 @@ export function renderProgression(container, progression, { selected = null, onS
             },
             h('span', { class: `chord-symbol${d.symbol.length > (slots.length > 1 ? 4 : 7) ? ' long' : ''}` }, d.symbol),
             h('span', { class: 'chord-roman' }, d.roman),
+            chordDetail(slot.chord, key, voicings[slot.index], display, d.notes),
             slot.chord.locked ? h('span', { class: 'lock-mark', 'aria-hidden': 'true' }, '🔒') : null,
           );
         }),
