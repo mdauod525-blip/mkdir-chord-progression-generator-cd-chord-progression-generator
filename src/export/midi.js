@@ -1,8 +1,8 @@
 /**
  * Standard MIDI File (format 1) writer.
  *   Track 0: tempo, time signature, key signature, track name
- *   Track 1: chords (upper voices), channel 1, Electric Piano
- *   Track 2: bass, channel 2, Acoustic Bass
+ *   Track 1: chords (upper voices), channel 1, program matching the chosen sound
+ *   Track 2: bass, channel 2 (piano left hand or acoustic bass)
  */
 import { eighthsPerMeasure, eighthsPerTempoBeat, midiTimeSignatureBytes } from '../theory/timeSignature.js';
 import { describeChord } from '../theory/chords.js';
@@ -70,7 +70,11 @@ export function keySignature(tonic, mode) {
  * @param progression  generated progression
  * @param voicings     array of { bass, upper } aligned with progression.slots
  */
-export function progressionToMidi(progression, voicings) {
+/** General MIDI programs matching the app's sounds. */
+export const GM_PROGRAMS = { piano: 0, guitar: 25, keys: 4, pad: 89, organ: 16 };
+const GM_BASS = { piano: 0, guitar: 32 };
+
+export function progressionToMidi(progression, voicings, { instrument = 'piano' } = {}) {
   const s = progression.settings;
   const key = makeKey(s.tonic, s.mode);
   const epm = eighthsPerMeasure(s.timeSignature);
@@ -85,11 +89,11 @@ export function progressionToMidi(progression, voicings) {
 
   const chordEvents = [
     { tick: 0, order: 0, bytes: [0xff, 0x03, ...vlq(textBytes('Chords').length), ...textBytes('Chords')] },
-    { tick: 0, order: 0, bytes: [0xc0, 4] }, // Electric Piano 1
+    { tick: 0, order: 0, bytes: [0xc0, GM_PROGRAMS[instrument] ?? 0] },
   ];
   const bassEvents = [
     { tick: 0, order: 0, bytes: [0xff, 0x03, ...vlq(textBytes('Bass').length), ...textBytes('Bass')] },
-    { tick: 0, order: 0, bytes: [0xc1, 32] }, // Acoustic Bass
+    { tick: 0, order: 0, bytes: [0xc1, GM_BASS[instrument] ?? 32] },
   ];
 
   progression.slots.forEach((slot, i) => {

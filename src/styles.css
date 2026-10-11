@@ -381,6 +381,19 @@ input[type='range']::-moz-range-thumb {
   font-size: 14px;
 }
 
+.sound-block {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.arp-options {
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
 .sound-options {
   border-top: 1px solid var(--border);
   padding-top: 10px;
@@ -1200,7 +1213,20 @@ input[type='range']::-moz-range-thumb {
     column-gap: 20px;
   }
 
-  .settings #controls > .sound-options {
+  .settings #controls > .sound-block {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.arp-options {
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.sound-options {
     grid-column: 1 / -1;
   }
 
