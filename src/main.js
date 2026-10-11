@@ -2,9 +2,9 @@
  * ChordLab app controller: wires settings, generator, audio and views together.
  */
 import './styles.css';
-import { $ } from './ui/dom.js';
+import { $, segmented } from './ui/dom.js';
 import { renderControls, syncTempo, TEMPO_RANGE } from './ui/controls.js';
-import { renderProgression, setPlayhead } from './ui/progressionView.js';
+import { renderProgression, setPlayhead, DISPLAY_MODES } from './ui/progressionView.js';
 import { renderChordEditor } from './ui/chordEditor.js';
 import { renderFavorites } from './ui/favoritesView.js';
 import { renderExport, shareOrDownload, copyText } from './ui/exportView.js';
@@ -56,6 +56,8 @@ const state = {
   voicings: [],
   selected: null,
   soundOpen: Boolean(prefs.soundOpen),
+  display: DISPLAY_MODES[prefs.display] ? prefs.display : 'notes',
+  shapeIndex: 0,
   dirty: false,
   playing: false,
 };
@@ -106,7 +108,7 @@ let persistTimer = null;
 function persist() {
   clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
-    store.savePrefs({ settings: state.settings, playback: state.playback, soundOpen: state.soundOpen, last: state.progression });
+    store.savePrefs({ settings: state.settings, playback: state.playback, soundOpen: state.soundOpen, display: state.display, last: state.progression });
   }, 250);
 }
 
@@ -148,7 +150,23 @@ function renderProgressionArea() {
   const s = p.settings;
   els.title.textContent = `${s.tonic} ${s.mode}`;
   els.sub.textContent = `${s.timeSignature} · ${s.tempo} BPM · ${GENRES[s.genre].label} · ${MOODS[s.mood].label} · ${s.measures} bars`;
-  renderProgression(els.measures, p, { selected: isSheetOpen(els.chordSheet) ? state.selected : null, onSelect: openChordEditor });
+  renderProgression(els.measures, p, {
+    selected: isSheetOpen(els.chordSheet) ? state.selected : null,
+    onSelect: openChordEditor,
+    display: state.display,
+    voicings: state.voicings,
+  });
+}
+
+function renderDisplayMode() {
+  const el = $('#display-mode');
+  el.replaceChildren(
+    segmented('display', Object.entries(DISPLAY_MODES), state.display, (v) => {
+      state.display = v;
+      renderProgressionArea();
+      persist();
+    }, { label: 'Show under each chord', className: 'display-switch' }),
+  );
 }
 
 function renderGenerateButton() {
@@ -275,7 +293,7 @@ async function togglePlay() {
 function renderEditor() {
   renderChordEditor(
     els.chordSheet,
-    { progression: state.progression, index: state.selected },
+    { progression: state.progression, index: state.selected, voicing: state.voicings[state.selected], shapeIndex: state.shapeIndex },
     {
       play: () => transport.preview(state.voicings[state.selected]),
       regenerate: () => {
@@ -295,6 +313,10 @@ function renderEditor() {
         setProgression(updateChord(state.progression, state.selected, { quality }));
         transport.preview(state.voicings[state.selected]);
       },
+      setShape: (i) => {
+        state.shapeIndex = i;
+        renderEditor();
+      },
       select: (i) => openChordEditor(i),
       close: closeSheet,
     },
@@ -302,6 +324,7 @@ function renderEditor() {
 }
 
 function openChordEditor(index) {
+  if (index !== state.selected) state.shapeIndex = 0;
   state.selected = index;
   renderEditor();
   openSheet(els.chordSheet, {
@@ -424,6 +447,7 @@ function init() {
   renderSettings();
   renderGenerateButton();
   renderTransportToggles();
+  renderDisplayMode();
   renderFavCount();
   revoice();
   renderProgressionArea();

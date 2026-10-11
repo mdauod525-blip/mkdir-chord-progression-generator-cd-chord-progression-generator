@@ -73,6 +73,7 @@ describe('text export', () => {
     expect(txt).toMatch(/\| C\s+\| G\/B\s+\| Am7\s+\| F\s+\|/);
     expect(txt).toContain('V⁶');
     expect(txt).toMatch(/Am7\s+A C E G/);
+    expect(txt).toMatch(/\n  C\s+C E G\s+x32010/);
   });
 
   it('supports ASCII output and one-line summaries', () => {

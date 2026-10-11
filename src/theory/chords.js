@@ -179,3 +179,11 @@ export function describeChord(chord, key) {
     func: chord.func,
   };
 }
+
+/** Function mapping a pitch class to its spelling within this chord (e.g. 10 → "B♭"). */
+export function chordSpeller(chord, key) {
+  const pcs = chordPitchClasses(chord, key);
+  const names = chordNotes(chord, key);
+  const map = new Map(pcs.map((pc, i) => [pc, names[i]]));
+  return (pc) => map.get(mod12(pc)) ?? spell(key.tonicLetter, pc);
+}

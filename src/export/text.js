@@ -3,6 +3,7 @@
  * messages or a DAW's marker list.
  */
 import { describeChord } from '../theory/chords.js';
+import { guitarShapes, shapeToString } from '../theory/guitar.js';
 import { makeKey } from '../theory/scales.js';
 import { toAscii } from '../theory/notes.js';
 import { GENRES, MOODS } from '../generator/styles.js';
@@ -53,14 +54,15 @@ export function progressionToText(progression, { ascii = false, barsPerLine = 4,
     lines.push('  ' + rrow.map((r) => r.padEnd(width)).join('  '));
   }
 
-  const legend = [
-    '',
-    'Chord tones:',
-    ...progression.slots
-      .map((slot) => describeChord(slot.chord, key))
-      .filter((d, i, arr) => arr.findIndex((x) => x.symbol === d.symbol) === i)
-      .map((d) => `  ${d.symbol.padEnd(12)} ${d.notes.join(' ')}`),
-  ];
+  const seen = new Set();
+  const legend = ['', 'Chord tones and guitar shapes (low E → high E):'];
+  for (const slot of progression.slots) {
+    const d = describeChord(slot.chord, key);
+    if (seen.has(d.symbol)) continue;
+    seen.add(d.symbol);
+    const shape = guitarShapes(slot.chord, key)[0];
+    legend.push(`  ${d.symbol.padEnd(12)} ${d.notes.join(' ').padEnd(14)} ${shape ? shapeToString(shape) : ''}`.trimEnd());
+  }
 
   return fmt([...header, ...lines, ...legend].join('\n')) + '\n';
 }
