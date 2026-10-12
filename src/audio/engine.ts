@@ -68,6 +68,7 @@ export class AudioEngine {
     } catch {
       /* unsupported */
     }
+    this.startMediaChannel();
     if (this.ctx.state !== 'running') {
       try {
         await this.ctx.resume();
@@ -82,6 +83,29 @@ export class AudioEngine {
     s.connect(this.ctx.destination);
     s.start(0);
     return this.ctx;
+  }
+
+  private media: HTMLAudioElement | null = null;
+
+  /**
+   * Older iOS versions mute Web Audio when the ring/silent switch is off.
+   * Playing a silent looping <audio> element (inside the tap) moves the page
+   * into the "media playback" audio category, which ignores the switch.
+   */
+  private startMediaChannel(): void {
+    if (typeof Audio === 'undefined' || !/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)) return;
+    try {
+      if (!this.media) {
+        this.media = new Audio(silentWavDataUri());
+        this.media.loop = true;
+        this.media.setAttribute('playsinline', '');
+        this.media.setAttribute('x-webkit-airplay', 'deny');
+        this.media.preload = 'auto';
+      }
+      void this.media.play().catch(() => {});
+    } catch {
+      /* best effort */
+    }
   }
 
   get ready(): boolean {
@@ -242,3 +266,29 @@ export class AudioEngine {
 
 /** One engine for the whole app (one AudioContext). */
 export const audio = new AudioEngine();
+
+/** A short silent mono WAV as a data URI (for the iOS media-channel unlock). */
+function silentWavDataUri(): string {
+  const rate = 8000;
+  const n = rate / 2; // 0.5 s
+  const bytes = new Uint8Array(44 + n);
+  const dv = new DataView(bytes.buffer);
+  const str = (o: number, t: string) => [...t].forEach((c, i) => dv.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF');
+  dv.setUint32(4, 36 + n, true);
+  str(8, 'WAVE');
+  str(12, 'fmt ');
+  dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true); // PCM
+  dv.setUint16(22, 1, true); // mono
+  dv.setUint32(24, rate, true);
+  dv.setUint32(28, rate, true);
+  dv.setUint16(32, 1, true);
+  dv.setUint16(34, 8, true); // 8-bit
+  str(36, 'data');
+  dv.setUint32(40, n, true);
+  bytes.fill(128, 44); // 8-bit silence
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return `data:audio/wav;base64,${btoa(bin)}`;
+}

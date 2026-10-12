@@ -6,10 +6,27 @@ import { ImportSheet } from './ImportSheet';
 import { Term } from '../ui/Glossary';
 import { toast } from '../ui/toast';
 import { navigate } from '../state/router';
+import { audio, AudioEngine } from '../audio/engine';
 
 export function Settings() {
   const state = useApp();
   const [importing, setImporting] = useState(false);
+  const [soundStatus, setSoundStatus] = useState<string | null>(null);
+
+  const testSound = async () => {
+    if (!AudioEngine.supported()) {
+      setSoundStatus('This browser does not support Web Audio.');
+      return;
+    }
+    const ctx = await audio.unlock();
+    if (!ctx) return setSoundStatus('Audio could not start.');
+    const t = audio.now() + 0.1;
+    [0, 0.5, 1].forEach((d, i) => audio.click(t + d, i === 0 ? 2 : 1));
+    const g: (number | null)[] = [43, 47, 50, 55, 59, 67];
+    audio.warm(g.filter((n): n is number => n !== null));
+    audio.strum(t + 1.5, { strings: g, stroke: 'D', accent: true });
+    setSoundStatus(`Audio is ${ctx.state} (${ctx.sampleRate} Hz). You should hear three clicks, then a G chord.`);
+  };
   const p = state.prefs;
   return (
     <div className="screen settings">
@@ -40,6 +57,19 @@ export function Settings() {
             Show <Term id="roman">Roman numerals</Term> next to chords
           </span>
         </label>
+      </section>
+
+      <section className="card">
+        <h2 className="h2">Sound check</h2>
+        <button type="button" className="btn btn-primary" onClick={() => void testSound()}>
+          Test sound
+        </button>
+        {soundStatus && <p className="small" role="status">{soundStatus}</p>}
+        <ul className="small muted tips">
+          <li>Turn the volume up with the side buttons while the sound plays.</li>
+          <li>iPhone: if you still hear nothing, flip the ring/silent switch to ring (orange hidden) and try again.</li>
+          <li>Bluetooth headphones can add a short delay; the app compensates for it where the browser reports it.</li>
+        </ul>
       </section>
 
       <section className="card">

@@ -309,6 +309,8 @@ export class Player {
     if (typeof requestAnimationFrame === 'undefined') return;
     cancelAnimationFrame(this.raf);
     const loop = () => {
+      // Extra scheduling pass on every frame (cheap; guards against a stalled timer).
+      this.transport.pump();
       this.refreshFrame();
       if (this.snap.status === 'playing') this.raf = requestAnimationFrame(loop);
     };
