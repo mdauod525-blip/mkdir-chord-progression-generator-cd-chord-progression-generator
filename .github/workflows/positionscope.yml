@@ -1,0 +1,29 @@
+name: PositionScope — test & build
+
+on:
+  push:
+    paths: ['positionscope/**', '.github/workflows/positionscope.yml']
+  pull_request:
+    paths: ['positionscope/**', '.github/workflows/positionscope.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: positionscope
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: positionscope/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
