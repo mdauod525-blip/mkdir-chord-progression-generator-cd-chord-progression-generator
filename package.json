@@ -1,18 +1,27 @@
 {
-  "name": "chordlab",
-  "version": "1.0.0",
+  "name": "strumflow",
+  "version": "0.1.0",
   "private": true,
-  "description": "ChordLab — a mobile-friendly chord progression generator for musicians and songwriters.",
+  "description": "StrumFlow — a mobile-first guitar song learning app: chords, strumming, timing and practice. Includes ChordLab, a chord progression generator.",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "vite build",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "license": "MIT",
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
   "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^5.9.3",
     "vite": "^8.3.4",
     "vitest": "^5.0.3"
   }
