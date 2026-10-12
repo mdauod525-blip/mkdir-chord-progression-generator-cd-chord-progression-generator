@@ -2405,3 +2405,8 @@ input[type='checkbox'] {
 .meta-chips .chip.term {
   padding: 0 10px;
 }
+
+.tips {
+  padding-left: 18px;
+  margin: 8px 0 0;
+}
