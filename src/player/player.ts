@@ -216,6 +216,12 @@ export class Player {
     this.refreshFrame();
   }
 
+  /** Replace the song (e.g. a different strum pattern for a section), keeping position and settings. */
+  setSong(song: Song): void {
+    this.song = song;
+    this.setTranspose(this.snap.transpose, this.snap.prefer);
+  }
+
   updateSettings(patch: Partial<PracticeSettings>): void {
     const settings = { ...this.snap.settings, ...patch };
     if (patch.bpm !== undefined) {
