@@ -7,6 +7,10 @@ metronome, looping and transposition. Runs entirely in the browser: no account, 
 The repository also contains **ChordLab**, the earlier chord progression generator, served at
 `/chordlab/` and linked from StrumFlow.
 
+> **DealBridge AI**: a fix-and-flip deal sourcing, underwriting and investor-matching platform
+> (FastAPI + PostgreSQL/PostGIS + Next.js) that lives in [`dealbridge/`](dealbridge/README.md).
+> It is self-contained and does not affect StrumFlow.
+
 > **PositionScope** — a separate, self-contained Next.js stock-research app for position trading
 > (scanner, charts, support/resistance, valuation, alerts, paper trading) — lives in
 > [`positionscope/`](positionscope/README.md). It has its own `package.json` and does not affect StrumFlow.

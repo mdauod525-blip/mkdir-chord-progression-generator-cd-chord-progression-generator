@@ -1,0 +1,36 @@
+# Local full stack: PostGIS + Redis + API + scheduler + web.  docker compose up --build
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment: { POSTGRES_USER: dealbridge, POSTGRES_PASSWORD: dealbridge, POSTGRES_DB: dealbridge }
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U dealbridge"], interval: 5s, retries: 10 }
+  redis:
+    image: redis:7-alpine
+  api:
+    build: ./backend
+    env_file: [./backend/.env]
+    environment:
+      DEALBRIDGE_DATABASE_URL: postgresql+psycopg://dealbridge:dealbridge@db:5432/dealbridge
+      DEALBRIDGE_REDIS_URL: redis://redis:6379/0
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["8000:8000"]
+  worker:
+    build: ./backend
+    env_file: [./backend/.env]
+    environment:
+      DEALBRIDGE_DATABASE_URL: postgresql+psycopg://dealbridge:dealbridge@db:5432/dealbridge
+      DEALBRIDGE_SCHEDULER_ENABLED: "true"
+    command: ["python", "-m", "app.worker"]
+    depends_on: [api]
+  web:
+    image: node:22-alpine
+    working_dir: /web
+    volumes: [./frontend:/web]
+    environment: { DEALBRIDGE_API_URL: "http://api:8000", NEXT_TELEMETRY_DISABLED: "1" }
+    command: sh -c "npm ci && npm run build && npm start"
+    ports: ["3000:3000"]
+    depends_on: [api]
+volumes:
+  pgdata:

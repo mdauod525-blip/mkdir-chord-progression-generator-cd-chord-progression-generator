@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* Design tokens (light). Dark values are selected steps, not an automatic flip. */
+:root {
+  --bg: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f1f0ec;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --line: #e1e0d9;
+  --axis: #c3c2b7;
+  --accent: #2a78d6;
+  --accent-ink: #ffffff;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --good: #006300;
+  --good-bg: #e3f3e3;
+  --warn: #8a5a00;
+  --warn-bg: #fdf1d6;
+  --bad: #b42323;
+  --bad-bg: #fbe4e4;
+  --demo: #6250d6;
+  --demo-bg: #ece9fb;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --line: #2c2c2a;
+    --axis: #383835;
+    --accent: #3987e5;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --good: #0ca30c;
+    --good-bg: #12280f;
+    --warn: #fab219;
+    --warn-bg: #2d2410;
+    --bad: #e66767;
+    --bad-bg: #2f1414;
+    --demo: #9085e9;
+    --demo-bg: #201c3a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232321; --ink: #f0efec; --ink-2: #c3c2b7;
+  --muted: #898781; --line: #2c2c2a; --axis: #383835; --accent: #3987e5; --series-1: #3987e5;
+  --series-2: #d95926; --series-3: #199e70; --good: #0ca30c; --good-bg: #12280f; --warn: #fab219;
+  --warn-bg: #2d2410; --bad: #e66767; --bad-bg: #2f1414; --demo: #9085e9; --demo-bg: #201c3a;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-good: var(--good);
+  --color-good-bg: var(--good-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-bad: var(--bad);
+  --color-bad-bg: var(--bad-bg);
+  --color-demo: var(--demo);
+  --color-demo-bg: var(--demo-bg);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+.tabular { font-variant-numeric: tabular-nums; }
+.leaflet-container { background: var(--surface-2); border-radius: 0.75rem; }

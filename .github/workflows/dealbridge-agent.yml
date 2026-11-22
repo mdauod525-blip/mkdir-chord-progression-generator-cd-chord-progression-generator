@@ -1,0 +1,48 @@
+name: DealBridge AI — scheduled agent
+
+# Free alternative to an always-on worker. Disabled until you set the repository variable
+# DEALBRIDGE_AGENT_ENABLED=true and the secrets below (Settings → Secrets and variables → Actions).
+on:
+  schedule:
+    - cron: '17 11 * * *'   # daily  ~06:17 America/New_York (EST)
+    - cron: '41 12 * * 1'   # weekly Monday ~07:41 ET
+  workflow_dispatch:
+    inputs:
+      workflow:
+        description: daily or weekly
+        default: daily
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    if: vars.DEALBRIDGE_AGENT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dealbridge/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13', cache: pip, cache-dependency-path: dealbridge/backend/requirements.txt }
+      - run: pip install -r requirements.txt
+      - name: Run workflow
+        env:
+          DEALBRIDGE_ENVIRONMENT: production
+          DEALBRIDGE_DATABASE_URL: ${{ secrets.DEALBRIDGE_DATABASE_URL }}
+          DEALBRIDGE_JWT_SECRET: ${{ secrets.DEALBRIDGE_JWT_SECRET }}
+          DEALBRIDGE_ENCRYPTION_KEY: ${{ secrets.DEALBRIDGE_ENCRYPTION_KEY }}
+          DEALBRIDGE_ANTHROPIC_API_KEY: ${{ secrets.DEALBRIDGE_ANTHROPIC_API_KEY }}
+          DEALBRIDGE_EMAIL_PROVIDER: ${{ vars.DEALBRIDGE_EMAIL_PROVIDER || 'console' }}
+          DEALBRIDGE_RESEND_API_KEY: ${{ secrets.DEALBRIDGE_RESEND_API_KEY }}
+          DEALBRIDGE_EMAIL_FROM: ${{ vars.DEALBRIDGE_EMAIL_FROM }}
+          DEALBRIDGE_MAILING_ADDRESS: ${{ vars.DEALBRIDGE_MAILING_ADDRESS }}
+          DEALBRIDGE_CENSUS_API_KEY: ${{ secrets.DEALBRIDGE_CENSUS_API_KEY }}
+          DEALBRIDGE_HUD_API_TOKEN: ${{ secrets.DEALBRIDGE_HUD_API_TOKEN }}
+        run: |
+          WF="${{ github.event.inputs.workflow }}"
+          if [ -z "$WF" ]; then
+            if [ "${{ github.event.schedule }}" = "41 12 * * 1" ]; then WF=weekly; else WF=daily; fi
+          fi
+          python -m app.cli "$WF"
