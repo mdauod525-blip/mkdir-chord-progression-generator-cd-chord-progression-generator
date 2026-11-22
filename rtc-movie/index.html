@@ -83,7 +83,7 @@ canvas { display: block; width: 100%; height: 100%; }
   function fillAll(c, style) { c.fillStyle = style; c.fillRect(0, 0, W, H); }
 
   /* ---------- precomputed textures ---------- */
-  let hero = null, heroF = null, cut = null, grainPat = null, stone = null, cracks = null, mtn = null, ridge = null, crestCracks = null;
+  let bloomC = null, hero = null, heroF = null, cut = null, grainPat = null, stone = null, cracks = null, mtn = null, ridge = null, crestCracks = null;
   function genCracks(seed, n, lenA, lenB, depth) {
     const out = []; let k = seed;
     function br(x, y, a, len, d, p0) {
@@ -155,6 +155,7 @@ canvas { display: block; width: 100%; height: 100%; }
       s.stroke();
     }
 
+    buildPlates();
     cracks = genCracks(11, 7, 110, 90, 3);
     crestCracks = genCracks(77, 4, 60, 50, 2);
     mtn = []; for (let x = -20; x <= W + 20; x += 14) {
@@ -163,6 +164,144 @@ canvas { display: block; width: 100%; height: 100%; }
     ridge = []; for (let x = 540; x <= W + 20; x += 18) {
       ridge.push([x, 530 - 280 * Math.exp(-Math.pow((x - 930) / 200, 2)) + (rnd(x * 0.91) - 0.5) * 14]);
     }
+  }
+
+  /* ---------- photographic plates (procedural) ---------- */
+  function hash2(x, y) {
+    let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function vnoise(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+  function fbm(x, y, o = 6) { let s = 0, a = 0.5, f = 1, n = 0; for (let i = 0; i < o; i++) { s += a * vnoise(x * f + i * 17.3, y * f - i * 9.1); n += a; f *= 2.03; a *= 0.5; } return s / n; }
+  function cellEdge(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y); let f1 = 9, f2 = 9;
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+      const cx = xi + i + hash2(xi + i, yi + j), cy = yi + j + hash2(xi + i + 71, yi + j + 13);
+      const d = (cx - x) * (cx - x) + (cy - y) * (cy - y);
+      if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
+    }
+    return Math.sqrt(f2) - Math.sqrt(f1);
+  }
+  const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const addc = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
+  const mulc = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+  function ramp(t, st) {
+    t = clamp(t); for (let i = 1; i < st.length; i++) if (t <= st[i][0]) { const q = (t - st[i - 1][0]) / (st[i][0] - st[i - 1][0]); return mixc(st[i - 1][1], st[i][1], q); }
+    return st[st.length - 1][1];
+  }
+  function plate(pw, ph, fn, alpha) {
+    const cv = document.createElement('canvas'); cv.width = pw; cv.height = ph;
+    const x = cv.getContext('2d'), id = x.createImageData(pw, ph), d = id.data;
+    for (let j = 0; j < ph; j++) for (let i = 0; i < pw; i++) {
+      const c = fn((i / pw) * W, (j / ph) * H, i, j), k = (j * pw + i) * 4;
+      d[k] = c[0]; d[k + 1] = c[1]; d[k + 2] = c[2]; d[k + 3] = alpha ? c[3] : 255;
+    }
+    x.putImageData(id, 0, 0); return cv;
+  }
+  const kessY = x => 530 - 290 * Math.exp(-Math.pow((x - 930) / 210, 2)) - 26 * (fbm(x * 0.012, 0.5, 4) - 0.5) - 10 * (fbm(x * 0.05, 2.5, 3) - 0.5);
+  const farY = x => 488 - 70 * fbm(x * 0.0035, 3.3, 5);
+  const mY = x => 610 - 410 * Math.exp(-Math.pow((x - 640) / 330, 2)) + 22 * (fbm(x * 0.02, 1.7, 4) - 0.5) - 40 * (fbm(x * 0.006, 9, 4) - 0.5);
+  const PL = {};
+  function buildPlates() {
+    const PW = 960, PH = 540;
+    PL.dusk = plate(PW, PH, (x, y) => {
+      const hz = 530, ky = kessY(x), fy = farY(x);
+      const sky = ramp(y / hz, [[0, [12, 10, 34]], [0.45, [58, 30, 62]], [0.8, [190, 92, 58]], [1, [250, 176, 98]]]);
+      const dx = x - 420, dy = (y - 470) * 1.4, d = Math.sqrt(dx * dx + dy * dy);
+      const sun = Math.exp(-d / 55) + 0.45 * Math.exp(-d / 260);
+      if (y < hz && y < ky && y < fy) {
+        let col = addc(sky, [255, 190, 120], sun);
+        const n = fbm(x * 0.0032 + 7, y * 0.012, 6);
+        const cv = ss(0.5, 0.7, n) * ss(110, 240, y) * (1 - ss(420, 500, y));
+        if (cv > 0) {
+          const sh = fbm(x * 0.01, y * 0.03 + 3, 4);
+          const cc = mixc([34, 18, 40], [255, 150, 92], clamp((0.15 + y / 640 + 0.6 * Math.exp(-d / 380)) * (0.55 + 0.7 * sh)));
+          col = mixc(col, cc, cv * 0.92);
+        }
+        return col;
+      }
+      if (y < hz && y < ky) { const n = fbm(x * 0.03, y * 0.03, 4); return mulc(mixc(sky, [66, 38, 60], 0.6), 0.85 + 0.25 * n); }
+      if (y < hz + 2) {
+        const rock = fbm(x * 0.018, y * 0.018, 6), rid = 1 - Math.abs(2 * fbm(x * 0.01, y * 0.02, 5) - 1);
+        const kg = q => -290 * Math.exp(-Math.pow((q - 930) / 210, 2)), slope = (kg(x + 3) - kg(x - 3)) / 6, light = clamp(0.5 - slope * 0.9);
+        let col = mulc([58, 30, 40], 0.35 + 0.85 * rock * light + 0.3 * rid * light);
+        const depth = y - ky; if (depth < 5) col = addc(col, [255, 140, 80], (1 - depth / 5) * 0.55 * light);
+        return mixc(col, [150, 78, 74], 0.3 * Math.exp(-(y - ky) / 160) + 0.25 * ss(470, 530, y));
+      }
+      const g = fbm(x * 0.008, (y - hz) * 0.05 + 1, 5), dz = y - hz;
+      let col = mulc([36, 22, 22], 0.6 + 0.8 * g);
+      col = mixc(col, [150, 86, 60], Math.exp(-dz / 22));
+      return addc(col, [255, 170, 100], 0.3 * Math.exp(-Math.abs(x - 420) / 70) * Math.exp(-dz / 35));
+    });
+    PL.night = plate(PW, PH, (x, y, i, j) => {
+      const my = mY(x);
+      if (y < my) {
+        let col = ramp(y / 600, [[0, [2, 4, 12]], [0.6, [9, 16, 38]], [1, [26, 38, 68]]]);
+        const dl = Math.abs((x - 100) * 0.357 + (y - 520) * 0.934), band = Math.exp(-Math.pow(dl / 120, 2));
+        const neb = fbm(x * 0.006, y * 0.006, 6), dust = fbm(x * 0.02 + 5, y * 0.02, 5);
+        const mw = band * (0.3 + neb) * (1 - 0.85 * ss(0.45, 0.68, dust));
+        col = addc(col, [74, 74, 100], mw);
+        const h = hash2(i, j);
+        if (h > 0.9965) col = addc(col, [255, 248, 236], (h - 0.9965) / 0.0035);
+        else if (band > 0.3 && h > 0.985) col = addc(col, [190, 195, 220], 0.4 * (h - 0.985) / 0.015);
+        const dm = Math.hypot(x - 230, y - 190);
+        if (dm < 34) return mixc([168, 172, 188], [244, 246, 252], fbm(x * 0.09, y * 0.09, 4) * 1.1);
+        col = addc(col, [140, 152, 196], 0.45 * Math.exp(-(dm - 34) / 30) + 0.16 * Math.exp(-dm / 230));
+        return mixc(col, [38, 52, 84], 0.5 * ss(380, 610, y) * Math.exp(-Math.max(0, my - y) / 120));
+      }
+      const rock = fbm(x * 0.02, y * 0.02, 6), rid = 1 - Math.abs(2 * fbm(x * 0.008 + 3, y * 0.016, 5) - 1);
+      const mg = q => -410 * Math.exp(-Math.pow((q - 640) / 330, 2)), slope = (mg(x + 3) - mg(x - 3)) / 6, moon = clamp(0.5 - slope * 1.3);
+      let col = mulc([20, 25, 38], 0.3 + 1.0 * rock * moon + 0.45 * rid * moon);
+      const depth = y - my; if (depth < 4) col = addc(col, [120, 140, 190], (1 - depth / 4) * 0.45 * moon);
+      return mixc(col, [30, 42, 70], 0.6 * ss(470, 660, y));
+    });
+    PL.salt = plate(PW, PH, (x, y) => {
+      const hz = 470;
+      if (y < hz) {
+        let col = ramp((y - 88) / (hz - 88), [[0, [50, 60, 78]], [0.7, [158, 148, 138]], [1, [214, 196, 166]]]);
+        const cl = fbm(x * 0.002 + 1, y * 0.008, 5);
+        col = mixc(col, [222, 212, 198], 0.35 * ss(0.5, 0.75, cl) * ss(88, 300, y) * (1 - ss(300, 440, y)));
+        const ry = hz - 18 - 30 * fbm(x * 0.004, 4.1, 5);
+        if (y > ry) col = mixc(col, [118, 118, 132], 0.55 * (0.85 + 0.3 * fbm(x * 0.05, y * 0.05, 3)));
+        return col;
+      }
+      const dz = y - hz + 0.6, wx = ((x - 640) / dz) * 40, wz = 3000 / dz;
+      let col = mulc([206, 194, 174], 0.82 + 0.25 * fbm(wx * 0.04, wz * 0.04, 4));
+      const crack = (1 - ss(0.025, 0.07, cellEdge(wx * 0.04, wz * 0.04))) * ss(6, 60, dz);
+      col = mulc(col, 1 - 0.5 * crack);
+      col = mixc(col, [214, 196, 166], Math.exp(-dz / 22));
+      return mulc(col, 1 - 0.4 * ss(560, 720, y));
+    });
+    PL.cave = plate(PW, PH, (x, y) => {
+      const r = fbm(x * 0.006, y * 0.006, 6), rid = 1 - Math.abs(2 * fbm(x * 0.012 + 9, y * 0.012, 6) - 1), fine = fbm(x * 0.05, y * 0.05, 3);
+      const v = 0.2 + 0.7 * r * rid + 0.2 * fine;
+      const blue = Math.exp(-Math.hypot(x - 300, y - 340) / 240), green = Math.exp(-Math.hypot(x - 930, y - 420) / 320);
+      return [v * (10 + 60 * blue + 22 * green), v * (12 + 100 * blue + 80 * green), v * (15 + 160 * blue + 30 * green)];
+    });
+    PL.space = plate(PW, PH, (x, y, i, j) => {
+      const n = fbm(x * 0.004, y * 0.004, 6), m = fbm(x * 0.011 + 4, y * 0.011, 5);
+      let col = [90 * n * n * m, 26 * n * n, 110 * n * n * n];
+      const h = hash2(i + 3, j + 7); if (h > 0.996) col = addc(col, [255, 250, 245], (h - 0.996) / 0.004);
+      return col;
+    });
+    const tex = (seed, fire) => plate(256, 256, (x, y, i, j) => {
+      const u = i / 256 - 0.5, v = j / 256 - 0.5, n = fbm(i * 0.03 + seed, j * 0.03 - seed, 6), m = fbm(i * 0.08 + seed * 2, j * 0.08, 4);
+      const d = Math.sqrt(u * u + v * v) * 2;
+      const val = clamp(1 - d * 1.15 + (n - 0.5) * 0.9 + (m - 0.5) * 0.3);
+      if (fire) { const c = ramp(val, [[0, [40, 10, 4]], [0.35, [150, 34, 10]], [0.6, [236, 104, 30]], [0.8, [255, 190, 90]], [1, [255, 246, 214]]]); return [c[0], c[1], c[2], 255 * ss(0.02, 0.3, val)]; }
+      const g = 40 + 70 * m * val; return [g, g * 0.92, g * 0.86, 230 * ss(0.0, 0.45, val)];
+    }, true);
+    PL.fire = tex(3, true); PL.fire2 = tex(11, true); PL.smoke = tex(5, false); PL.smoke2 = tex(19, false);
+  }
+  function tex(c, img, x, y, w, h, rot = 0, a = 1, op) {
+    c.save(); c.translate(x, y); if (rot) c.rotate(rot); c.globalAlpha *= a; if (op) c.globalCompositeOperation = op;
+    c.drawImage(img, -w / 2, -h / 2, w, h); c.restore();
   }
 
   /* ---------- figures ---------- */
@@ -217,15 +356,18 @@ canvas { display: block; width: 100%; height: 100%; }
     c.restore();
   }
   function drawHuman(c, x, y, h, lean, fill, rim) {
-    c.save(); c.translate(x, y); c.scale(h, h); c.fillStyle = c.strokeStyle = fill; c.lineCap = 'round';
+    c.save(); c.translate(x, y); c.scale(h, h); c.fillStyle = c.strokeStyle = fill; c.lineCap = 'round'; c.lineJoin = 'round';
     if (rim) blur(c, rim, 14);
     const hx = -0.18 * lean, hy = -0.9;
-    c.beginPath(); c.arc(hx, hy, 0.07, 0, 7); c.fill();
-    c.lineWidth = 0.13; line(c, hx * 0.9, hy + 0.12, hx * 0.3 + 0.03, -0.48);
-    c.lineWidth = 0.08; line(c, hx * 0.3 + 0.03, -0.48, 0.16, -0.24); line(c, 0.16, -0.24, 0.2, 0);
-    line(c, hx * 0.3, -0.48, -0.02, -0.24); line(c, -0.02, -0.24, 0.02, 0);
-    c.lineWidth = 0.06; line(c, hx * 0.8, hy + 0.17, hx - 0.18, -0.7); line(c, hx - 0.18, -0.7, hx - 0.22, -0.56);
-    line(c, hx * 0.8, hy + 0.17, hx - 0.14, -0.62);
+    c.beginPath(); c.ellipse(hx, hy, 0.062, 0.076, 0, 0, 7); c.fill();
+    c.lineWidth = 0.06; line(c, hx * 0.95, hy + 0.06, hx * 0.85, hy + 0.13);
+    poly(c, [[hx * 0.85 - 0.11, hy + 0.13], [hx * 0.85 + 0.11, hy + 0.13], [hx * 0.3 + 0.1, -0.47], [hx * 0.3 - 0.07, -0.47]]);
+    c.beginPath(); c.ellipse(hx * 0.85 - 0.1, hy + 0.15, 0.04, 0.03, 0, 0, 7); c.ellipse(hx * 0.85 + 0.1, hy + 0.15, 0.04, 0.03, 0, 0, 7); c.fill();
+    c.lineWidth = 0.1; line(c, hx * 0.3 + 0.05, -0.47, 0.15, -0.24); c.lineWidth = 0.075; line(c, 0.15, -0.24, 0.2, -0.02);
+    c.lineWidth = 0.1; line(c, hx * 0.3 - 0.02, -0.47, -0.02, -0.24); c.lineWidth = 0.075; line(c, -0.02, -0.24, 0.02, -0.02);
+    c.lineWidth = 0.055; line(c, 0.2, -0.02, 0.27, 0); line(c, 0.02, -0.02, 0.09, 0);
+    c.lineWidth = 0.065; line(c, hx * 0.85 - 0.1, hy + 0.16, hx - 0.17, -0.68); c.lineWidth = 0.055; line(c, hx - 0.17, -0.68, hx - 0.23, -0.56);
+    c.lineWidth = 0.065; line(c, hx * 0.85 + 0.08, hy + 0.17, hx - 0.06, -0.64); c.lineWidth = 0.055; line(c, hx - 0.06, -0.64, hx - 0.15, -0.6);
     c.restore();
   }
   function hexEye(c, cx, cy, rx, ry, rot, e, cell, seed) {
@@ -392,14 +534,10 @@ canvas { display: block; width: 100%; height: 100%; }
   // 1 — Ashgrove at dusk
   scene(9, 18, (c, t, lt) => {
     c.save(); c.translate(640, 400); const z = 1 + 0.05 * (lt / 9); c.scale(z, z); c.translate(-640, -400);
-    fillAll(c, vgrad(c, 0, 560, [[0, '#1a1030'], [0.45, '#5d2440'], [0.78, '#d0673a'], [1, '#f4a95b']]));
-    const sg = c.createRadialGradient(420, 470, 10, 420, 470, 260);
-    sg.addColorStop(0, 'rgba(255,214,150,0.95)'); sg.addColorStop(0.18, 'rgba(255,170,90,0.5)'); sg.addColorStop(1, 'rgba(255,120,60,0)');
-    c.fillStyle = sg; c.fillRect(0, 0, W, H);
-    c.fillStyle = '#3a1a2a'; c.beginPath(); c.moveTo(540, 560); ridge.forEach(p => c.lineTo(p[0], p[1])); c.lineTo(W + 20, 560); c.fill();
-    c.fillStyle = '#16090f';
-    c.beginPath(); c.moveTo(445, 540); c.quadraticCurveTo(497, 455, 470, 385); c.lineTo(545, 385); c.quadraticCurveTo(520, 455, 572, 540); c.fill();
-    c.fillRect(0, 528, W, H);
+    c.drawImage(PL.dusk, 0, 0, W, H);
+    c.fillStyle = '#140a0d';
+    c.beginPath(); c.moveTo(445, 534); c.quadraticCurveTo(497, 455, 470, 385); c.lineTo(545, 385); c.quadraticCurveTo(520, 455, 572, 534); c.fill();
+    c.fillStyle = vgrad(c, 528, 545, [[0, 'rgba(20,10,13,0)'], [1, 'rgba(20,10,13,0.0)']]);
     // water tower
     c.strokeStyle = '#16090f'; c.lineWidth = 5; line(c, 215, 530, 233, 395); line(c, 285, 530, 267, 395); line(c, 250, 530, 250, 395);
     c.lineWidth = 2; line(c, 222, 470, 278, 440); line(c, 278, 470, 222, 440);
@@ -456,7 +594,9 @@ canvas { display: block; width: 100%; height: 100%; }
     fillAll(c, '#0b0806');
     const sPos = 150 * lt + 130 * lt * lt, v = 150 + 260 * lt;
     for (const [x0, x1] of [[0, 330], [950, W]]) {
-      c.fillStyle = vgrad(c, 0, H, [[0, '#1d140d'], [1, '#0d0906']]); c.fillRect(x0, 0, x1 - x0, H);
+      const off = (sPos * 0.9) % H;
+      c.save(); c.beginPath(); c.rect(x0, 0, x1 - x0, H); c.clip(); c.filter = 'sepia(1) saturate(0.6) brightness(0.55)';
+      c.drawImage(PL.cave, x0, -off, x1 - x0, H); c.drawImage(PL.cave, x0, H - off, x1 - x0, H); c.restore();
       c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 2;
       for (let i = 0; i < 40; i++) { const y = H - ((sPos * 0.9 + i * 61 + rnd(i) * 40) % (H + 80)); line(c, x0, y, x1, y + (rnd(i + 3) - 0.5) * 10); }
     }
@@ -585,13 +725,7 @@ canvas { display: block; width: 100%; height: 100%; }
     const ox = 640, oy = 470, burst = t - 57.5;
     let sh = 3 * ss(55, 57.5, t) * (burst < 0 ? 1 : 0) + (burst > 0 ? 12 * Math.exp(-burst * 2) : 0);
     c.translate((rnd(Math.floor(t * 50)) - 0.5) * sh, (rnd(Math.floor(t * 50) + 3) - 0.5) * sh);
-    fillAll(c, vgrad(c, 0, 600, [[0, '#02040b'], [0.6, '#0a1430'], [1, '#18264a']]));
-    for (let i = 0; i < 220; i++) { c.fillStyle = `rgba(220,230,255,${0.2 + rnd(i + 5) * 0.6})`; c.fillRect(rnd(i) * W, 88 + rnd(i + 1) * 360, 1.4, 1.4); }
-    const mg = c.createRadialGradient(230, 190, 10, 230, 190, 160); mg.addColorStop(0, 'rgba(230,236,255,0.9)'); mg.addColorStop(0.25, 'rgba(160,180,230,0.25)'); mg.addColorStop(1, 'rgba(0,0,0,0)');
-    c.fillStyle = mg; c.fillRect(0, 0, 500, 400);
-    c.fillStyle = '#dfe6ff'; c.beginPath(); c.arc(230, 190, 34, 0, 7); c.fill();
-    c.fillStyle = '#05070d'; c.beginPath(); c.moveTo(-20, H); mtn.forEach(p => c.lineTo(p[0], p[1])); c.lineTo(W + 20, H); c.fill();
-    c.strokeStyle = 'rgba(150,175,230,0.35)'; c.lineWidth = 2; c.beginPath(); mtn.forEach((p, i) => (i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]))); c.stroke();
+    c.drawImage(PL.night, -10, -10, W + 20, H + 20);
     const p = 1.45 * ss(54.4, 57.4, t);
     const gl = c.createRadialGradient(ox, oy, 4, ox, oy, 60 + 260 * clamp(p)); gl.addColorStop(0, `rgba(120,255,130,${0.55 * clamp(p)})`); gl.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = gl; c.fillRect(0, 0, W, H);
@@ -678,8 +812,7 @@ canvas { display: block; width: 100%; height: 100%; }
       return;
     }
     if (t < 71.0) {
-      fillAll(c, vgrad(c, 88, 560, [[0, '#1a1228'], [0.7, '#6a2c2a'], [1, '#b5562c']]));
-      c.fillStyle = '#120a08'; c.fillRect(0, 560, W, H);
+      c.drawImage(PL.dusk, -320, -40, W * 1.25, H * 1.1);
       const fire = t - 69.3, hit = t - 69.4;
       const glowUp = ss(70.4, 70.9, t);
       drawFigure(c, 960, 650, 430, { t, filter: 'brightness(0.62) sepia(0.35) saturate(1.2)', rim: 'rgba(255,140,60,0.75)', eyes: 1, chest: 0.4 + 0.5 * glowUp });
@@ -690,24 +823,21 @@ canvas { display: block; width: 100%; height: 100%; }
       if (fire > 0 && fire < 0.14) { const g = c.createRadialGradient(600, 470, 4, 600, 470, 160); g.addColorStop(0, 'rgba(255,250,220,1)'); g.addColorStop(0.4, 'rgba(255,170,60,0.6)'); g.addColorStop(1, 'rgba(255,100,0,0)'); c.fillStyle = g; c.fillRect(440, 310, 320, 320); }
       if (fire > 0 && hit < 0) { c.strokeStyle = '#fff1c0'; c.lineWidth = 4; const q = fire / 0.1; line(c, lerp(600, 940, q) - 40, lerp(470, 420, q) + 6, lerp(600, 940, q), lerp(470, 420, q)); }
       if (hit > 0) {
-        const r = 40 + 200 * (1 - Math.exp(-hit * 5)), a = clamp(1 - hit / 0.9);
-        const g = c.createRadialGradient(950, 430, 4, 950, 430, r); g.addColorStop(0, `rgba(255,245,200,${a})`); g.addColorStop(0.4, `rgba(255,140,40,${a * 0.8})`); g.addColorStop(1, 'rgba(120,30,0,0)');
-        c.fillStyle = g; c.fillRect(950 - r, 430 - r, 2 * r, 2 * r);
-        const sm = clamp(1 - (t - 70.0) / 0.9);
-        for (let i = 0; i < 34; i++) {
-          const ang = rnd(i) * Math.PI * 2, d = 30 + rnd(i + 1) * 120 * (0.5 + hit);
-          c.fillStyle = `rgba(40,34,32,${0.85 * sm})`; c.beginPath(); c.arc(950 + Math.cos(ang) * d, 430 + Math.sin(ang) * d * 0.7 - hit * 40, 40 + rnd(i + 2) * 50, 0, 7); c.fill();
+        const r = 120 + 380 * (1 - Math.exp(-hit * 4)), a = clamp(1 - hit / 1.0);
+        const sm = clamp(1 - (t - 70.1) / 0.8);
+        for (let i = 0; i < 9; i++) {
+          const ang = rnd(i) * Math.PI * 2, d = r * 0.25 * rnd(i + 1);
+          tex(c, i % 2 ? PL.smoke : PL.smoke2, 950 + Math.cos(ang) * d, 430 + Math.sin(ang) * d * 0.6 - hit * 60, r * (0.8 + 0.4 * rnd(i + 2)), r * (0.7 + 0.3 * rnd(i + 3)), rnd(i + 4) * 6 + hit * 0.4, 0.95 * sm);
         }
+        tex(c, PL.fire, 950, 430, r * 0.9, r * 0.8, hit * 0.8, a, 'screen');
+        tex(c, PL.fire2, 950, 420, r * 0.6, r * 0.55, -hit, a, 'screen');
         if (hit < 0.08) fillAll(c, 'rgba(255,230,180,0.5)');
       }
       return;
     }
     if (t < 79) {
       const lt = t - 72.2, fb = t - 74.5;
-      fillAll(c, vgrad(c, 88, 470, [[0, '#2b3442'], [1, '#c9b79a']]));
-      c.fillStyle = vgrad(c, 470, H, [[0, '#8f8676'], [1, '#3e372f']]); c.fillRect(0, 470, W, H);
-      c.strokeStyle = 'rgba(40,34,28,0.35)'; c.lineWidth = 1;
-      for (let i = 0; i < 26; i++) line(c, 640 + (rnd(i) - 0.5) * 300, 472, (rnd(i + 1) - 0.2) * W * 1.4 - 100, H);
+      c.drawImage(PL.salt, 0, 0, W, H);
       if (fb < 0) {
         drawFigure(c, 640, 484, 70, { t, filter: 'brightness(0.35)', eyes: 1, chest: 0.3 });
         const y = lerp(100, 455, Math.pow(clamp(lt / 2.3), 2));
@@ -716,20 +846,27 @@ canvas { display: block; width: 100%; height: 100%; }
       } else {
         fillAll(c, `rgba(255,140,60,${0.45 * Math.exp(-fb * 0.5)})`);
         const R = 70 + 230 * (1 - Math.exp(-fb * 1.4)), cy = 470 - 190 * ss(0, 4.2, fb);
-        const sk = c.createLinearGradient(0, cy, 0, 472); sk.addColorStop(0, '#ff9a3c'); sk.addColorStop(1, '#5a2414');
-        c.fillStyle = sk; poly(c, [[640 - 30 - R * 0.12, cy], [640 + 30 + R * 0.12, cy], [640 + 70 + R * 0.35, 472], [640 - 70 - R * 0.35, 472]]);
-        const dust = 100 + 700 * (1 - Math.exp(-fb * 0.7));
-        c.fillStyle = 'rgba(90,64,48,0.92)'; c.beginPath(); c.ellipse(640, 472, dust, dust * 0.11, 0, 0, 7); c.fill();
-        for (let i = 0; i < 16; i++) {
-          const a = (i / 16) * Math.PI * 2 + fb * 0.3, rr = R * (0.55 + 0.15 * rnd(i));
-          const x = 640 + Math.cos(a) * rr, y = cy + Math.sin(a) * rr * 0.42;
-          const g = c.createRadialGradient(x, y, 2, x, y, R * 0.5);
-          g.addColorStop(0, fb < 1.2 ? '#fff3c4' : '#ffb35c'); g.addColorStop(0.5, '#e0602a'); g.addColorStop(1, 'rgba(60,24,16,0)');
-          c.fillStyle = g; c.beginPath(); c.arc(x, y, R * 0.5, 0, 7); c.fill();
+        const dust = 100 + 760 * (1 - Math.exp(-fb * 0.7));
+        for (let i = 0; i < 14; i++) {
+          const dx = (i / 13 - 0.5) * 2 * dust;
+          tex(c, i % 2 ? PL.smoke : PL.smoke2, 640 + dx, 462 - 20 * rnd(i), dust * 0.42, dust * 0.2 + 50, rnd(i) * 6, 0.55);
         }
-        const core = c.createRadialGradient(640, cy, 4, 640, cy, R * 0.75); core.addColorStop(0, '#fffbe6'); core.addColorStop(0.5, 'rgba(255,190,90,0.9)'); core.addColorStop(1, 'rgba(255,100,40,0)');
-        c.fillStyle = core; c.beginPath(); c.arc(640, cy, R * 0.75, 0, 7); c.fill();
-        const ring = 60 + fb * 1300; c.strokeStyle = `rgba(255,235,200,${clamp(0.8 - fb * 0.35)})`; c.lineWidth = 4;
+        const sw = 34 + R * 0.16;
+        for (let k = 0; k < 6; k++) {
+          const yy = lerp(472, cy, k / 5);
+          tex(c, k % 2 ? PL.smoke : PL.smoke2, 640 + Math.sin(k * 2 + fb) * 6, yy, sw * 2.2, (472 - cy) / 3 + 40, k + fb * 0.2, 0.9);
+          tex(c, PL.fire2, 640, yy, sw * 1.2, (472 - cy) / 3 + 30, k - fb * 0.3, clamp(1.3 - fb * 0.18), 'screen');
+        }
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2 + fb * 0.25, rr = R * 0.5;
+          tex(c, i % 2 ? PL.smoke : PL.smoke2, 640 + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.4, R * 1.1, R * 0.8, a + fb * 0.3, 0.95);
+        }
+        for (let i = 0; i < 7; i++) {
+          const a = (i / 7) * Math.PI * 2 - fb * 0.3, rr = R * 0.38;
+          tex(c, i % 2 ? PL.fire : PL.fire2, 640 + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.4, R * 0.95, R * 0.7, a, clamp(1.4 - fb * 0.15), 'screen');
+        }
+        tex(c, PL.fire, 640, cy, R * 1.3, R * 0.95, fb * 0.4, clamp(1.6 - fb * 0.2), 'screen');
+        const ring = 60 + fb * 1300; c.strokeStyle = `rgba(255,235,200,${clamp(0.35 - fb * 0.2)})`; c.lineWidth = 3;
         c.beginPath(); c.ellipse(640, 474, ring, ring * 0.1, 0, 0, 7); c.stroke();
         const walk = ss(76.0, 79.0, t);
         if (t > 75.8) {
@@ -806,8 +943,7 @@ canvas { display: block; width: 100%; height: 100%; }
       for (let i = 0; i < 160; i++) { const x = (rnd(i) * W + (t - 91) * 300 * (0.5 + rnd(i + 1))) % W; c.fillStyle = 'rgba(230,210,170,0.35)'; c.fillRect(x, 300 + rnd(i + 2) * 280, 14, 1.5); }
       cap(c, t, 91.3, 93.8, 'CIVILIZATIONS DISAPPEAR.', big); fade = 1 - env(t, 91, 94, 0.3, 0.3);
     } else if (t < 97) {
-      fillAll(c, '#000');
-      for (let i = 0; i < 160; i++) { c.fillStyle = `rgba(255,255,255,${0.3 * rnd(i + 2)})`; c.fillRect(rnd(i) * W, 88 + rnd(i + 1) * 544, 1.2, 1.2); }
+      c.drawImage(PL.space, 0, 0, W, H);
       const q = ss(94.3, 96.7, t), R = lerp(300, 12, q), cx = 760, cy = 330;
       const g = c.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 2.2);
       g.addColorStop(0, q < 0.9 ? '#ffd9a8' : '#e9f0ff'); g.addColorStop(0.45, q < 0.9 ? `rgba(255,80,30,${1 - q * 0.4})` : 'rgba(170,190,255,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -816,7 +952,7 @@ canvas { display: block; width: 100%; height: 100%; }
       c.strokeStyle = `rgba(255,90,40,${0.6 * (1 - q)})`; c.lineWidth = 3; c.beginPath(); c.arc(220, 900, 420, -1.9, -0.4); c.stroke();
       cap(c, t, 94.3, 96.8, 'STARS BURN OUT.', big); fade = 1 - env(t, 94, 97, 0.3, 0.3);
     } else {
-      fillAll(c, '#000');
+      fillAll(c, '#000'); c.globalAlpha = 1 - ss(97.2, 99.4, t); c.drawImage(PL.space, 0, 0, W, H); c.globalAlpha = 1;
       for (let i = 0; i < 700; i++) {
         const off = 97.2 + rnd(i + 30) * 2.4; if (t > off) continue;
         c.fillStyle = `rgba(255,255,255,${(0.3 + 0.7 * rnd(i + 2)) * (0.7 + 0.3 * Math.sin(t * 6 + i))})`; c.fillRect(rnd(i) * W, 88 + rnd(i + 1) * 544, 1.5, 1.5);
@@ -872,10 +1008,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
   // 14 — stinger
   scene(112, 118, (c, t) => {
-    fillAll(c, vgrad(c, 0, H, [[0, '#06080a'], [1, '#0d0f10']]));
-    c.fillStyle = '#020303';
-    poly(c, [[0, 88], [W, 88], [W, 200], [980, 150], [700, 190], [420, 140], [160, 210], [0, 180]]);
-    poly(c, [[0, 632], [0, 520], [120, 560], [W, 590], [W, 632]]);
+    c.drawImage(PL.cave, 0, 0, W, H);
     const mg = c.createRadialGradient(300, 360, 10, 300, 360, 380); mg.addColorStop(0, 'rgba(95,168,255,0.35)'); mg.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = mg; c.fillRect(0, 0, W, H);
     for (const [x, y] of [[150, 300], [260, 290], [370, 300]]) {
@@ -910,8 +1043,16 @@ canvas { display: block; width: 100%; height: 100%; }
         break;
       }
     }
+    // bloom: bright areas bleed light like a real lens
+    if (!bloomC) { bloomC = document.createElement('canvas'); bloomC.width = 320; bloomC.height = 180; }
+    const bc = bloomC.getContext('2d'); bc.globalCompositeOperation = 'copy'; bc.filter = 'brightness(0.9) contrast(2.2)';
+    bc.drawImage(ctx.canvas, 0, 0, 320, 180); bc.filter = 'none';
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = 0.42;
+    ctx.filter = `blur(${Math.round(14 * k)}px)`; ctx.drawImage(bloomC, 0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore();
+    // grade: lift shadows toward teal, warm the highlights
+    ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.18; ctx.fillStyle = '#2a5d66'; ctx.fillRect(0, 0, W, H); ctx.restore();
     // grain
-    ctx.save(); ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.22;
+    ctx.save(); ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.14;
     const ox = Math.floor(rnd(Math.floor(t * 24)) * 256), oy = Math.floor(rnd(Math.floor(t * 24) + 1) * 256);
     for (let x = -ox; x < W; x += 256) for (let y = -oy; y < H; y += 256) ctx.drawImage(grainPat, x, y);
     ctx.restore();
