@@ -44,6 +44,7 @@ canvas { display: block; width: 100%; height: 100%; }
   <span class="time" id="time">0:00 / 1:58</span>
   <button type="button" id="fs" class="fs">Full screen</button>
 </div>
+<img id="hero" alt="" hidden src="data:image/jpeg;base64,{{HERO}}">
 <audio id="aud" preload="auto" src="data:audio/mpeg;base64,{{AUDIO}}"></audio>
 
 <script>
@@ -92,8 +93,9 @@ canvas { display: block; width: 100%; height: 100%; }
   window.addEventListener('keydown', e => { if (e.code === 'Space' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') { e.preventDefault(); playing ? stop() : play(); } });
   window.addEventListener('resize', size);
 
-  Promise.all([document.fonts.load('40px "Anton"'), document.fonts.load('500 20px "IBM Plex Mono"')]).catch(() => {}).then(() => {
-    FILM.init();
+  const heroImg = document.getElementById('hero');
+  Promise.all([document.fonts.load('40px "Anton"'), document.fonts.load('500 20px "IBM Plex Mono"'), heroImg.decode()]).catch(() => {}).then(() => {
+    FILM.init(heroImg);
     if (renderMode) { window.renderAt = (x, scale) => { if (cv.width !== 1280 * scale) { cv.width = 1280 * scale; cv.height = 720 * scale; } FILM.render(ctx, x, scale); return cv.toDataURL('image/jpeg', 0.93); }; window.READY = true; return; }
     size();
   });
