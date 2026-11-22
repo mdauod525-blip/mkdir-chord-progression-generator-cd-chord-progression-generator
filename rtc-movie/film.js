@@ -32,7 +32,7 @@
   function fillAll(c, style) { c.fillStyle = style; c.fillRect(0, 0, W, H); }
 
   /* ---------- precomputed textures ---------- */
-  let hero = null, heroF = null, grainPat = null, stone = null, cracks = null, mtn = null, ridge = null, crestCracks = null;
+  let hero = null, heroF = null, cut = null, grainPat = null, stone = null, cracks = null, mtn = null, ridge = null, crestCracks = null;
   function genCracks(seed, n, lenA, lenB, depth) {
     const out = []; let k = seed;
     function br(x, y, a, len, d, p0) {
@@ -67,7 +67,13 @@
       c.stroke();
     }
   }
-  function init(img) {
+  function init(img, cutImg) {
+    if (cutImg && cutImg.naturalWidth) {
+      cut = document.createElement('canvas'); cut.width = HW; cut.height = HH;
+      const h = cut.getContext('2d'); h.drawImage(cutImg, 0, 0, HW, HH); h.globalCompositeOperation = 'destination-in';
+      const g = h.createLinearGradient(0, 0, 0, HH); g.addColorStop(0, '#000'); g.addColorStop(0.86, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      h.fillStyle = g; h.fillRect(0, 0, HW, HH);
+    }
     if (img && img.naturalWidth) {
       hero = img; heroF = document.createElement('canvas'); heroF.width = HW; heroF.height = HH;
       const h = heroF.getContext('2d'); h.drawImage(img, 0, 0, HW, HH); h.globalCompositeOperation = 'destination-in';
@@ -286,6 +292,23 @@
     if (a <= 0) return;
     const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, col.replace('A', a.toFixed(3))); g.addColorStop(1, col.replace('A', '0'));
     c.fillStyle = g; c.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  // The character cut out of the artwork. x = body centre, by = bottom edge, h = full height.
+  function drawFigure(c, x, by, h, o = {}) {
+    const sc = h / HH, x0 = x - 638 * sc, y0 = by - h;
+    const map = p => [x0 + p[0] * sc, y0 + p[1] * sc];
+    if (!cut) return map;
+    c.save();
+    if (o.alpha != null) c.globalAlpha *= o.alpha;
+    if (o.rim) blur(c, o.rim, o.rimBlur || 24);
+    if (o.filter) c.filter = o.filter;
+    c.drawImage(cut, x0, y0, HW * sc, HH * sc);
+    c.restore();
+    const e = (o.eyes ?? 1) * (o.alpha ?? 1);
+    if (e > 0) for (const p of [P.eyeL, P.eyeR]) { const [ex, ey] = map(p); glowAt(c, ex, ey, Math.max(8, 70 * sc), 'rgba(255,40,25,A)', 0.6 * e); glowAt(c, ex, ey, Math.max(2.5, 9 * sc), 'rgba(255,225,210,A)', e); }
+    const ch = (o.chest ?? 0.5) * (o.alpha ?? 1);
+    if (ch > 0) { const [cx, cy] = map(P.chest); c.save(); c.globalCompositeOperation = 'screen'; glowAt(c, cx, cy, Math.max(14, 240 * sc), 'rgba(120,255,80,A)', ch * (0.7 + 0.3 * Math.sin((o.t || 0) * 3.2))); c.restore(); }
+    return map;
   }
   function rain(c, t, a) {
     c.strokeStyle = `rgba(190,205,225,${a})`; c.lineWidth = 1.2;
@@ -538,7 +561,7 @@
       const rise = ss(58.0, 59.8, t);
       if (rise > 0) {
         c.save(); c.beginPath(); c.rect(0, 0, W, oy + 30); c.clip();
-        drawRoach(c, ox, lerp(oy + 160, oy + 28, rise), 132, { t, rim: GREEN, rimBlur: 26, glow: 1, eyes: ss(59.2, 59.8, t) });
+        drawFigure(c, ox, lerp(oy + 240, oy + 45, rise), 210, { t, filter: 'brightness(0.75) saturate(0.9)', rim: 'rgba(93,255,110,0.9)', rimBlur: 30, eyes: ss(59.2, 59.8, t), chest: 0.7 });
         c.restore();
       }
       fillAll(c, `rgba(200,255,200,${clamp(Math.exp(-burst * 3))})`);
@@ -556,7 +579,7 @@
     fillAll(c, vgrad(c, dy0, 632, [[0, '#0b1424'], [1, '#1a1a1c']]));
     const pl = c.createRadialGradient(dx0 + 40, dy0 + 30, 4, dx0 + 40, dy0 + 30, 380); pl.addColorStop(0, `rgba(255,196,110,${0.7 * flick})`); pl.addColorStop(1, 'rgba(255,170,80,0)');
     c.fillStyle = pl; c.fillRect(0, 0, W, H);
-    drawRoach(c, 640, 760, 600, { t, rim: `rgba(255,190,100,${0.55 * flick + 0.2})`, rimBlur: 30, glow: 1, eyes: 1 });
+    drawFigure(c, 640, 770, 720, { t, filter: `brightness(${(0.32 + 0.2 * flick).toFixed(2)}) saturate(0.85)`, rim: `rgba(255,190,100,${0.55 * flick + 0.2})`, rimBlur: 34, eyes: 1, chest: 0.6 });
     c.restore();
     c.fillStyle = '#120b07'; poly(c, [[dx0, dy0], [dx0 - 120, dy0 - 40], [dx0 - 120, 690], [dx0, 632]]);
     c.strokeStyle = '#1e140d'; c.lineWidth = 14; c.strokeRect(dx0 - 7, dy0 - 7, dx1 - dx0 + 14, 660);
@@ -608,7 +631,7 @@
       c.fillStyle = '#120a08'; c.fillRect(0, 560, W, H);
       const fire = t - 69.3, hit = t - 69.4;
       const glowUp = ss(70.4, 70.9, t);
-      drawRoach(c, 960, 610, 300, { t, rim: 'rgba(255,140,60,0.7)', glow: 0.7 + glowUp, eyes: 1 });
+      drawFigure(c, 960, 650, 430, { t, filter: 'brightness(0.62) sepia(0.35) saturate(1.2)', rim: 'rgba(255,140,60,0.75)', eyes: 1, chest: 0.4 + 0.5 * glowUp });
       c.fillStyle = '#080605';
       poly(c, [[-20, 520], [370, 520], [400, 590], [-20, 600]]); poly(c, [[150, 470], [300, 470], [330, 522], [130, 522]]);
       c.save(); c.translate(300, 488); c.rotate(-0.06); c.fillRect(0, -9, 290, 18); c.fillRect(270, -13, 26, 26); c.restore();
@@ -635,7 +658,7 @@
       c.strokeStyle = 'rgba(40,34,28,0.35)'; c.lineWidth = 1;
       for (let i = 0; i < 26; i++) line(c, 640 + (rnd(i) - 0.5) * 300, 472, (rnd(i + 1) - 0.2) * W * 1.4 - 100, H);
       if (fb < 0) {
-        drawRoach(c, 640, 472, 46, { t, glow: 0.4, eyes: 1 });
+        drawFigure(c, 640, 484, 70, { t, filter: 'brightness(0.35)', eyes: 1, chest: 0.3 });
         const y = lerp(100, 455, Math.pow(clamp(lt / 2.3), 2));
         c.fillStyle = '#fff'; blur(c, '#fff', 8); c.beginPath(); c.arc(640, y, 2.5, 0, 7); c.fill(); noBlur(c);
         cap(c, t, 72.3, 74.4, 'SIXTEEN SECONDS.', { size: 20, y: 160, ls: 6, fo: 0.1 });
@@ -660,7 +683,7 @@
         const walk = ss(76.0, 79.0, t);
         if (t > 75.8) {
           c.globalAlpha = ss(75.8, 76.7, t);
-          drawRoach(c, 640, lerp(478, 640, walk), lerp(52, 360, walk), { t, rim: '#ff7a2a', rimBlur: 26, glow: 1, eyes: 1, fill: '#140806' });
+          drawFigure(c, 640, lerp(500, 700, walk), lerp(80, 560, walk), { t, filter: 'brightness(0.7) sepia(0.7) saturate(2.4) hue-rotate(-18deg)', rim: '#ff7a2a', rimBlur: 30, eyes: 1, chest: 0.8 });
           c.globalAlpha = 1;
         }
         fillAll(c, `rgba(255,255,250,${clamp(Math.exp(-fb * 2.6))})`);
@@ -812,7 +835,7 @@
     drawHuman(c, 330, 560, 150, 0.2, '#020304', 'rgba(95,168,255,0.7)');
     const gg = c.createRadialGradient(930, 420, 10, 930, 420, 320); gg.addColorStop(0, 'rgba(93,255,110,0.14)'); gg.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = gg; c.fillRect(0, 0, W, H);
-    drawRoach(c, 930, 575, 330, { t, rim: 'rgba(93,255,110,0.35)', glow: 0.8, eyes: 1 });
+    drawFigure(c, 930, 640, 520, { t, filter: 'brightness(0.42) saturate(0.8)', rim: 'rgba(93,255,110,0.35)', eyes: 1, chest: 0.5 });
     c.fillStyle = '#020303'; c.beginPath(); c.ellipse(1040, 562, 26, 11, 0, 0, 7); c.fill(); c.beginPath(); c.arc(1066, 552, 9, 0, 7); c.fill();
     cap(c, t, 112.7, 115.5, 'JUNO:  Okay, but seriously. Can we talk about the name?', { size: 22, y: 600, ls: 1 });
     cap(c, t, 115.9, 117.3, '“No.”', { size: 26, y: 600 });
