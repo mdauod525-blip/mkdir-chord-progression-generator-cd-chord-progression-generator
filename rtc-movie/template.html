@@ -1,0 +1,101 @@
+<title>Radioactive Titanium Cockroach</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a single cinema stage, the film framed in black with a slim control rail underneath. Deliberately dark-only. */
+@font-face { font-family: "Anton"; src: url(data:font/woff2;base64,{{ANTON}}) format("woff2"); font-display: block; }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 500; src: url(data:font/woff2;base64,{{PLEX}}) format("woff2"); font-display: block; }
+:root {
+  --bg: #050606; --panel: #0c0e0f; --line: #23282a; --fg: #e8ece6; --muted: #8b958d;
+  --rad: #5dff6e; --metal: #8a8d8f;
+  --display: "Anton", Impact, "Arial Narrow", sans-serif;
+  --mono: "IBM Plex Mono", "DejaVu Sans Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--mono); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px; box-sizing: border-box; }
+.stage { position: relative; width: min(100%, calc((100vh - 150px) * 16 / 9), 1600px); aspect-ratio: 16 / 9; max-width: 100%; background: #000; box-shadow: 0 0 0 1px var(--line), 0 30px 80px rgba(0,0,0,.7); }
+canvas { display: block; width: 100%; height: 100%; }
+.start { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 7%; background: linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,.65)); border: 0; cursor: pointer; color: var(--fg); font: inherit; }
+.start span { display: inline-flex; align-items: center; gap: 12px; padding: 12px 22px; border: 1px solid var(--rad); color: var(--rad); background: rgba(5,6,6,.75); letter-spacing: .25em; font-size: 13px; text-transform: uppercase; box-shadow: 0 0 24px rgba(93,255,110,.25); }
+.start:hover span, .start:focus-visible span { background: rgba(93,255,110,.12); }
+.start:focus-visible { outline: none; }
+.start span::before { content: ""; width: 0; height: 0; border-left: 11px solid currentColor; border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+.rail { width: min(100%, calc((100vh - 150px) * 16 / 9), 1600px); max-width: 100%; display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--muted); }
+.rail button { background: var(--panel); color: var(--fg); border: 1px solid var(--line); padding: 7px 12px; font: inherit; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+.rail button:hover { border-color: var(--metal); }
+.rail button:focus-visible, #seek:focus-visible { outline: 2px solid var(--rad); outline-offset: 2px; }
+#seek { flex: 1; min-width: 0; accent-color: var(--rad); }
+.time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.credit { width: min(100%, calc((100vh - 150px) * 16 / 9), 1600px); max-width: 100%; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+.credit b { font-family: var(--display); font-weight: 400; font-size: 15px; letter-spacing: .12em; color: var(--fg); }
+.credit b i { font-style: normal; color: var(--rad); }
+@media (max-width: 560px) { .rail { gap: 8px; } .rail .fs { display: none; } }
+</style>
+
+<div class="credit"><b><i>Radioactive</i> Titanium Cockroach</b><span>Teaser · 1:58 · sound on</span></div>
+<div class="stage" id="stage">
+  <canvas id="cv" width="1280" height="720" aria-label="Animated teaser for The Radioactive Titanium Cockroach"></canvas>
+  <button class="start" id="start" type="button"><span>Play teaser</span></button>
+</div>
+<div class="rail">
+  <button type="button" id="play">Play</button>
+  <input type="range" id="seek" min="0" max="118" step="0.01" value="0" aria-label="Seek">
+  <span class="time" id="time">0:00 / 1:58</span>
+  <button type="button" id="fs" class="fs">Full screen</button>
+</div>
+<audio id="aud" preload="auto" src="data:audio/mpeg;base64,{{AUDIO}}"></audio>
+
+<script>
+/*FILM*/
+</script>
+<script>
+(() => {
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const aud = document.getElementById('aud'), playBtn = document.getElementById('play'), seek = document.getElementById('seek');
+  const timeEl = document.getElementById('time'), startBtn = document.getElementById('start'), stage = document.getElementById('stage');
+  const D = FILM.DUR, POSTER = 108.9;
+  const renderMode = /[?&]render\b/.test(location.search);
+  let k = 1, playing = false, clock0 = 0, t = 0, useClock = false, raf = 0;
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  function size() {
+    if (renderMode) return;
+    const w = cv.clientWidth || 1280, dpr = window.devicePixelRatio || 1;
+    k = Math.max(0.5, Math.min(1.5, (w * dpr) / 1280));
+    cv.width = Math.round(1280 * k); cv.height = Math.round(720 * k);
+    draw(playing ? t : (t || POSTER));
+  }
+  function draw(x) { FILM.render(ctx, x, k); }
+  function now() { return useClock ? (performance.now() - clock0) / 1000 : aud.currentTime; }
+  function loop() {
+    t = now();
+    if (t >= D) { stop(); t = 0; seek.value = 0; draw(POSTER); timeEl.textContent = `${fmt(0)} / ${fmt(D)}`; return; }
+    draw(t); seek.value = t; timeEl.textContent = `${fmt(t)} / ${fmt(D)}`;
+    raf = requestAnimationFrame(loop);
+  }
+  function play() {
+    startBtn.hidden = true; playing = true; playBtn.textContent = 'Pause';
+    const p = aud.play();
+    const fallback = () => { useClock = true; clock0 = performance.now() - t * 1000; };
+    if (p && p.catch) p.catch(fallback); else if (aud.error) fallback();
+    if (useClock) clock0 = performance.now() - t * 1000;
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+  }
+  function stop() { playing = false; playBtn.textContent = 'Play'; aud.pause(); cancelAnimationFrame(raf); }
+  function goTo(x) { t = x; try { aud.currentTime = x; } catch (e) {} if (useClock) clock0 = performance.now() - x * 1000; draw(x); timeEl.textContent = `${fmt(x)} / ${fmt(D)}`; }
+
+  startBtn.addEventListener('click', () => { goTo(0); play(); });
+  playBtn.addEventListener('click', () => (playing ? stop() : (startBtn.hidden ? play() : (goTo(0), play()))));
+  seek.addEventListener('input', () => { startBtn.hidden = true; goTo(parseFloat(seek.value)); });
+  document.getElementById('fs').addEventListener('click', () => { const r = stage.requestFullscreen && stage.requestFullscreen(); if (r && r.catch) r.catch(() => {}); });
+  window.addEventListener('keydown', e => { if (e.code === 'Space' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') { e.preventDefault(); playing ? stop() : play(); } });
+  window.addEventListener('resize', size);
+
+  Promise.all([document.fonts.load('40px "Anton"'), document.fonts.load('500 20px "IBM Plex Mono"')]).catch(() => {}).then(() => {
+    FILM.init();
+    if (renderMode) { window.renderAt = (x, scale) => { if (cv.width !== 1280 * scale) { cv.width = 1280 * scale; cv.height = 720 * scale; } FILM.render(ctx, x, scale); return cv.toDataURL('image/jpeg', 0.93); }; window.READY = true; return; }
+    size();
+  });
+})();
+</script>
